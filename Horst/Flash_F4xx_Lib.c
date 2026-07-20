@@ -19,6 +19,11 @@
   #include "Translator_Tables.h"   // for txt_BLhex
 #endif
 
+//  Same hcan1 global every project's own CAN driver / task_CAN_Bus_Receiver.c
+//  already declares extern -- needed here so the two jump routines below can
+//  put CAN1 into a clean Stopped state before handing over to the next image.
+extern CAN_HandleTypeDef hcan1;
+
 #if 0  //<-------- copied from h.file  -------- just as info and  memeo help
   typedef struct
   {
@@ -1224,6 +1229,22 @@ void Bootloader_JumpToApplication(void)
   uint32_t  JumpAddress = *(__IO uint32_t*)(APP_ADDRESS + 4);
   FPTR program_start = (FPTR)(JumpAddress);
 
+  /*
+   *  Put CAN1 into a clean Stopped state before tearing anything down.
+   *  HAL_RCC_DeInit()/HAL_DeInit() further below only touch clock config --
+   *  a software jump is not a hardware reset, so they never reset the bxCAN
+   *  peripheral's own registers. If a heartbeat or MDP frame happens to be
+   *  mid-transmission in a TX mailbox at the exact instant of the jump, that
+   *  in-flight state survives untouched into the target image, which then
+   *  intermittently struggles to bring CAN1 back up depending on exactly
+   *  when the frame was caught mid-flight. Abort any pending TX and stop
+   *  the peripheral here, while SysTick/HAL_GetTick() is still running so
+   *  the HAL's own timeout handling works normally -- must happen before
+   *  portDISABLE_INTERRUPTS() below, not after.
+   */
+  HAL_CAN_AbortTxRequest ( &hcan1, CAN_TX_MAILBOX0 | CAN_TX_MAILBOX1 | CAN_TX_MAILBOX2 );
+  HAL_CAN_Stop ( &hcan1 );
+
   /*  Stop RTOS activity */
   portDISABLE_INTERRUPTS();
 
@@ -1303,6 +1324,20 @@ void Bootloader_JumpToColdStart(void)
 
   uint32_t  JumpAddress = *(__IO uint32_t*)(COLD_START_ADDRESS + 4);
   FPTR program_start = (FPTR)(JumpAddress);
+
+  /*
+   *  See Bootloader_JumpToApplication() above: put CAN1 into a clean
+   *  Stopped state first. This matters most right here -- this is the
+   *  path task_CAN_Bus_Receiver.c's 0x330 handler takes, called directly
+   *  out of the CAN receive loop while CAN_Bus_Sender may well have a
+   *  heartbeat mid-transmission in a TX mailbox at that exact moment.
+   *  Without this, that in-flight state survives the jump and is the
+   *  likely cause of the reboot-after-0x330 not coming back up reliably.
+   *  Must run before portDISABLE_INTERRUPTS() below, while HAL_GetTick()
+   *  is still ticking, so HAL_CAN_Stop()'s own timeout handling works.
+   */
+  HAL_CAN_AbortTxRequest ( &hcan1, CAN_TX_MAILBOX0 | CAN_TX_MAILBOX1 | CAN_TX_MAILBOX2 );
+  HAL_CAN_Stop ( &hcan1 );
 
   /*  Stop RTOS activity */
   portDISABLE_INTERRUPTS();
