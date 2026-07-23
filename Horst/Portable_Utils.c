@@ -613,8 +613,8 @@ uint16_t portable_strpos(char *haystack, char *needle)
 // ****************************************************************************
 {
   char *    ptr           = haystack;
-  uint8_t   len_haystack  = portable_strlen ( (char*) haystack );
-  uint8_t   len_needle    = portable_strlen ( (char*) needle );
+  uint8_t   len_haystack  = portable_strlen ( (char*)haystack );
+  uint8_t   len_needle    = portable_strlen ( (char*)needle );
   int8_t    len_diff      = len_haystack - len_needle;
   uint8_t   buffer[c_big_buffer_size];
   uint16_t  l_res;
@@ -624,8 +624,8 @@ uint16_t portable_strpos(char *haystack, char *needle)
 
   for ( uint8_t j = 0; j < len_diff; j++ )
   {
-    portable_strcpy_safe ( (char*) buffer, (char*)ptr, len_needle );
-    l_res = portable_strcmp ( (char*) buffer, (char*) needle );
+    portable_strcpy_safe ( (char*)buffer, (char*)ptr, len_needle );
+    l_res = portable_strcmp ( (char*)buffer, (char*)needle );
     if ( l_res == 0 )
       return j;
     ptr++;
@@ -886,14 +886,14 @@ void portable_ftoa ( double n, char* res, unsigned  no_of_decimals, unsigned res
     //fpart += 0.5;
     //uint8_t ll = portable_strlen(res);
 
-    len = portable_itoa ( (int)fpart, (char*) loc_buffer, 10 );  // convert integer part to string
+    len = portable_itoa ( (int)fpart, (char*)loc_buffer, 10 );  // convert integer part to string
 
     while ( ( no_of_decimals - len++) > 0 )
     {
-      PreFix_Char ( '0', (char*) loc_buffer );
+      PreFix_Char ( '0', (char*)loc_buffer );
     }
   }
-  strcat  ( (char*) res, (char*) loc_buffer );
+  strcat  ( (char*)res, (char*)loc_buffer );
 
   // if negative
   //
@@ -1270,18 +1270,18 @@ float  portable_atof ( const char * ValText )
   while ( ValText[0] == '.' )
   {
     got_dot = 1;
-    portable_trimleading ( (char*) ValText, '.' );
+    portable_trimleading ( (char*)ValText, '.' );
   }
 
   while ( ValText[0]== '+' )
   {
-    portable_trimleading ( (char*) ValText, '+' );
+    portable_trimleading ( (char*)ValText, '+' );
   }
 
   while ( ValText[0]== '-' )
   {
     sign = -sign;
-    portable_trimleading ( (char*) ValText, '-' );
+    portable_trimleading ( (char*)ValText, '-' );
   }
 
   //
@@ -1332,13 +1332,13 @@ int16_t portable_atoi ( const char* ValText )
   //
   while ( ValText[0]== '+' )
   {
-    portable_trimleading ( (char*) ValText, '+' );
+    portable_trimleading ( (char*)ValText, '+' );
   }
 
   while ( ValText[0]== '-' )
   {
     sign = -sign;
-    portable_trimleading ( (char*) ValText, '-' );
+    portable_trimleading ( (char*)ValText, '-' );
   }
 
   //
@@ -1379,13 +1379,13 @@ int32_t portable_atol ( const char* ValText )
   //
   while ( ValText[0]== '+' )
   {
-    portable_trimleading ( (char*) ValText, '+' );
+    portable_trimleading ( (char*)ValText, '+' );
   }
 
   while ( ValText[0]== '-' )
   {
     sign = -sign;
-    portable_trimleading ( (char*) ValText, '-' );
+    portable_trimleading ( (char*)ValText, '-' );
   }
 
   //
@@ -1557,13 +1557,13 @@ void lat_rad_2_NS_DDMMSS  ( float latitude_rad, uint8_t * buffer )
   memset ( (uint8_t * ) buffer, 0, c_len_coord_buffer );
   PreFix_Char_Bounded ( l_NS, (char*)buffer, c_len_coord_buffer );
   uint8_t ll = portable_strlen( (const char * ) buffer);
-  portable_itoa2 ( l_units, (char*) &buffer[ll], 3, 1, '0' );
+  portable_itoa2 ( l_units, (char*)&buffer[ll], 3, 1, '0' );
   PostFix_Char_Bounded ( ':', (char*)buffer, c_len_coord_buffer );
   ll = portable_strlen((const char * )buffer);
-  portable_itoa2 ( l_minutes, (char*) &buffer[ll], 2, 1, '0' );
+  portable_itoa2 ( l_minutes, (char*)&buffer[ll], 2, 1, '0' );
   PostFix_Char_Bounded ( ':', (char*)buffer, c_len_coord_buffer );
   ll = portable_strlen((const char * )buffer);
-  portable_itoa2 ( l_seconds, (char*) &buffer[ll], 2, 1, '0' );
+  portable_itoa2 ( l_seconds, (char*)&buffer[ll], 2, 1, '0' );
 }
 
 // ****************************************************************************
@@ -1710,23 +1710,23 @@ void  lat_2_NMEA_string ( float latitude_deg, uint8_t * loc_string )
   //
   #define c_lat_2_NMEA_MaxLen  16
 
-  portable_itoa2 ( l_lat_deg, (char*) buffer, 2, true, '0' );     // 2 digits, leading zero
-  portable_strcpy ( (char*) loc_string, (const char*) buffer );
+  portable_itoa2 ( l_lat_deg, (char*)buffer, 2, true, '0' );     // 2 digits, leading zero
+  portable_strcpy ( (char*)loc_string, (const char*) buffer );
 
-  portable_itoa2 ( l_lat_min, (char*) buffer, 2, true, '0' );     // 2 digits, leading zero
-  portable_strcat_bounded ( (char*) loc_string, (const char*) buffer, c_lat_2_NMEA_MaxLen );
+  portable_itoa2 ( l_lat_min, (char*)buffer, 2, true, '0' );     // 2 digits, leading zero
+  portable_strcat_bounded ( (char*)loc_string, (const char*) buffer, c_lat_2_NMEA_MaxLen );
 
-  PostFix_Char_Bounded ( '.', (char*) loc_string, c_lat_2_NMEA_MaxLen );
+  PostFix_Char_Bounded ( '.', (char*)loc_string, c_lat_2_NMEA_MaxLen );
   
-  portable_itoa2 ( l_lat_sec, (char*) buffer, 3, true, '0' );     // 3 digits, leading zero
-  portable_strcat_bounded ( (char*) loc_string, (const char*) buffer, c_lat_2_NMEA_MaxLen );
+  portable_itoa2 ( l_lat_sec, (char*)buffer, 3, true, '0' );     // 3 digits, leading zero
+  portable_strcat_bounded ( (char*)loc_string, (const char*) buffer, c_lat_2_NMEA_MaxLen );
 
 
-  PostFix_Char_Bounded ( ',', (char*) loc_string, c_lat_2_NMEA_MaxLen );
+  PostFix_Char_Bounded ( ',', (char*)loc_string, c_lat_2_NMEA_MaxLen );
   
-  PostFix_Char_Bounded ( l_NS, (char*) loc_string, c_lat_2_NMEA_MaxLen );                      // southern or northern hemisphere
+  PostFix_Char_Bounded ( l_NS, (char*)loc_string, c_lat_2_NMEA_MaxLen );                      // southern or northern hemisphere
 
-  PostFix_Char_Bounded ( ',', (char*) loc_string, c_lat_2_NMEA_MaxLen );
+  PostFix_Char_Bounded ( ',', (char*)loc_string, c_lat_2_NMEA_MaxLen );
 
   #undef c_lat_2_NMEA_MaxLen
 }
@@ -1767,23 +1767,23 @@ void  lon_2_NMEA_string ( float longitude_deg, uint8_t * loc_string )
   //
   #define c_lon_2_NMEA_MaxLen  16
 
-  portable_itoa2 ( l_lon_deg, (char*) buffer, 3, true, '0' );     // 3 digits, leading zero
-  portable_strcpy ( (char*) loc_string, (const char*) buffer );
+  portable_itoa2 ( l_lon_deg, (char*)buffer, 3, true, '0' );     // 3 digits, leading zero
+  portable_strcpy ( (char*)loc_string, (const char*) buffer );
 
-  portable_itoa2 ( l_lon_min, (char*) buffer, 2, true, '0' );     // 2 digits, leading zero
-  portable_strcat_bounded ( (char*) loc_string, (const char*) buffer, c_lon_2_NMEA_MaxLen );
+  portable_itoa2 ( l_lon_min, (char*)buffer, 2, true, '0' );     // 2 digits, leading zero
+  portable_strcat_bounded ( (char*)loc_string, (const char*) buffer, c_lon_2_NMEA_MaxLen );
 
 
-  PostFix_Char_Bounded ( '.', (char*) loc_string, c_lon_2_NMEA_MaxLen );
+  PostFix_Char_Bounded ( '.', (char*)loc_string, c_lon_2_NMEA_MaxLen );
   
-  portable_itoa2 ( l_lon_sec, (char*) buffer, 3, true, '0' );     // 3 digits, leading zero
-  portable_strcat_bounded ( (char*) loc_string, (const char*) buffer, c_lon_2_NMEA_MaxLen );
+  portable_itoa2 ( l_lon_sec, (char*)buffer, 3, true, '0' );     // 3 digits, leading zero
+  portable_strcat_bounded ( (char*)loc_string, (const char*) buffer, c_lon_2_NMEA_MaxLen );
 
-  PostFix_Char_Bounded ( ',', (char*) loc_string, c_lon_2_NMEA_MaxLen );
+  PostFix_Char_Bounded ( ',', (char*)loc_string, c_lon_2_NMEA_MaxLen );
   
-  PostFix_Char_Bounded ( l_EW, (char*) loc_string, c_lon_2_NMEA_MaxLen );                      // east or west hemisphere
+  PostFix_Char_Bounded ( l_EW, (char*)loc_string, c_lon_2_NMEA_MaxLen );                      // east or west hemisphere
   
-  PostFix_Char_Bounded ( ',', (char*) loc_string, c_lon_2_NMEA_MaxLen );
+  PostFix_Char_Bounded ( ',', (char*)loc_string, c_lon_2_NMEA_MaxLen );
 
   #undef c_lon_2_NMEA_MaxLen
 }
@@ -1959,36 +1959,36 @@ void DateTimeToString ( uint8_t * timestring, uint32_t date_time, uint8_t select
 
   if ( ( selector == 0 ) || ( selector == 1 ) )
   {
-    portable_itoa2(year + 2000, (char*) &l_buffer, 4, 1, '0');
-    portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_DateTimeToString_MaxLen);
+    portable_itoa2(year + 2000, (char*)&l_buffer, 4, 1, '0');
+    portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_DateTimeToString_MaxLen);
     if ( ! NoDelimiters )
-      PostFix_Char_Bounded ( '-', (char*) timestring, c_DateTimeToString_MaxLen );
+      PostFix_Char_Bounded ( '-', (char*)timestring, c_DateTimeToString_MaxLen );
 
-    portable_itoa2(month, (char*) &l_buffer, 2, 1, '0');
-    portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_DateTimeToString_MaxLen);
+    portable_itoa2(month, (char*)&l_buffer, 2, 1, '0');
+    portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_DateTimeToString_MaxLen);
     if ( ! NoDelimiters )
-      PostFix_Char_Bounded ( '-', (char*) timestring, c_DateTimeToString_MaxLen );
+      PostFix_Char_Bounded ( '-', (char*)timestring, c_DateTimeToString_MaxLen );
 
-    portable_itoa2(day, (char*) &l_buffer, 2, 1, '0');
-    portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_DateTimeToString_MaxLen);
+    portable_itoa2(day, (char*)&l_buffer, 2, 1, '0');
+    portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_DateTimeToString_MaxLen);
     if ( ! NoDelimiters )
-      PostFix_Char_Bounded (' ', (char*) timestring, c_DateTimeToString_MaxLen );
+      PostFix_Char_Bounded (' ', (char*)timestring, c_DateTimeToString_MaxLen );
   }
 
   if ( ( selector == 0 ) || ( selector == 2 ) )
   {
-    portable_itoa2(hour, (char*) &l_buffer, 2, 1, '0');
-    portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_DateTimeToString_MaxLen);
+    portable_itoa2(hour, (char*)&l_buffer, 2, 1, '0');
+    portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_DateTimeToString_MaxLen);
     if ( ! NoDelimiters )
-      PostFix_Char_Bounded ( ':', (char*) timestring, c_DateTimeToString_MaxLen );
+      PostFix_Char_Bounded ( ':', (char*)timestring, c_DateTimeToString_MaxLen );
 
-    portable_itoa2(minute, (char*) &l_buffer, 2, 1, '0');
-    portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_DateTimeToString_MaxLen);
+    portable_itoa2(minute, (char*)&l_buffer, 2, 1, '0');
+    portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_DateTimeToString_MaxLen);
     if ( ! NoDelimiters )
-      PostFix_Char_Bounded ( ':', (char*) timestring, c_DateTimeToString_MaxLen );
+      PostFix_Char_Bounded ( ':', (char*)timestring, c_DateTimeToString_MaxLen );
 
-    portable_itoa2(second, (char*) &l_buffer, 2, 1, '0');
-    portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_DateTimeToString_MaxLen);
+    portable_itoa2(second, (char*)&l_buffer, 2, 1, '0');
+    portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_DateTimeToString_MaxLen);
   }
 
   #undef c_DateTimeToString_MaxLen
@@ -2020,17 +2020,17 @@ void NMEA_TimeStamp ( uint8_t * timestring, uint32_t date_time )
 
   timestring[0] = '\0';
 
-  portable_itoa2(hour, (char*) &l_buffer, 2, 1, '0');
-  portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_NMEA_TimeStamp_MaxLen);
+  portable_itoa2(hour, (char*)&l_buffer, 2, 1, '0');
+  portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_NMEA_TimeStamp_MaxLen);
 
-  portable_itoa2(minute, (char*) &l_buffer, 2, 1, '0');
-  portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_NMEA_TimeStamp_MaxLen);
+  portable_itoa2(minute, (char*)&l_buffer, 2, 1, '0');
+  portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_NMEA_TimeStamp_MaxLen);
 
-  portable_itoa2(second, (char*) &l_buffer, 2, 1, '0');
-  portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_NMEA_TimeStamp_MaxLen);
+  portable_itoa2(second, (char*)&l_buffer, 2, 1, '0');
+  portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_NMEA_TimeStamp_MaxLen);
 
-  portable_strcat_bounded ( (char*) timestring, (char*) ".00,", c_NMEA_TimeStamp_MaxLen);
-  //PostFix_Char ( ',', (char*) timestring );
+  portable_strcat_bounded ( (char*)timestring, (char*)".00,", c_NMEA_TimeStamp_MaxLen);
+  //PostFix_Char ( ',', (char*)timestring );
 
   #undef c_NMEA_TimeStamp_MaxLen
 }
@@ -2061,16 +2061,16 @@ void NMEA_DateStamp ( uint8_t * timestring, uint32_t date_time )
 
   timestring[0] = '\0';
 
-  portable_itoa2(year, (char*) &l_buffer, 2, 1, '0');
-  portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_NMEA_DateStamp_MaxLen);
+  portable_itoa2(year, (char*)&l_buffer, 2, 1, '0');
+  portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_NMEA_DateStamp_MaxLen);
 
-  portable_itoa2(month, (char*) &l_buffer, 2, 1, '0');
-  portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_NMEA_DateStamp_MaxLen);
+  portable_itoa2(month, (char*)&l_buffer, 2, 1, '0');
+  portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_NMEA_DateStamp_MaxLen);
 
-  portable_itoa2(day, (char*) &l_buffer, 2, 1, '0');
-  portable_strcat_bounded ( (char*) timestring, (char*) &l_buffer, c_NMEA_DateStamp_MaxLen);
+  portable_itoa2(day, (char*)&l_buffer, 2, 1, '0');
+  portable_strcat_bounded ( (char*)timestring, (char*)&l_buffer, c_NMEA_DateStamp_MaxLen);
 
-  PostFix_Char_Bounded ( ',', (char*) timestring, c_NMEA_DateStamp_MaxLen );
+  PostFix_Char_Bounded ( ',', (char*)timestring, c_NMEA_DateStamp_MaxLen );
 
   #undef c_NMEA_DateStamp_MaxLen
 }

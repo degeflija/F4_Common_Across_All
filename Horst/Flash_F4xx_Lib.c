@@ -376,7 +376,7 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
 
     //  Step 1 : Open the hex input file to be flashed
     //
-    strcpy ( (char*) l_filename, (char*) g_DirListItems[dir_list_index] );
+    strcpy ( (char*)l_filename, (char*)g_DirListItems[dir_list_index] );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -575,7 +575,7 @@ void Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
 
     //  Step 1 : Open the hex input file to be flashed
     //
-    strcpy ( (char*) l_filename, (char*) txt_BLhex );
+    strcpy ( (char*)l_filename, (char*)txt_BLhex );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -719,7 +719,7 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     //  Step 1 :  Open hex file of application to be transferred via CAN
     //            and flashed in remote system
     //
-    strcpy ( (char*) l_filename, (char*) g_DirListItems[dir_list_index] );
+    strcpy ( (char*)l_filename, (char*)g_DirListItems[dir_list_index] );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -858,7 +858,7 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_BL ( uint16_t  dir_list_index )
 
     //  Step 1 : Open the hex input file to be flashed
     //
-    strcpy ( (char*) l_filename, (char*) "F4_BL.hex" );
+    strcpy ( (char*)l_filename, (char*)"F4_BL.hex" );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -1110,7 +1110,7 @@ void Appl_on_F4_Read_CAN_Flash_Local_BL ( void )
 
     //  Step 1 : Open the hex input file to be flashed
     //
-    strcpy ( (char*) l_filename, (char*) txt_BLhex );
+    strcpy ( (char*)l_filename, (char*)txt_BLhex );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -1295,6 +1295,19 @@ void Bootloader_JumpToApplication(void)
   HAL_RCC_DeInit();
   HAL_DeInit();
 
+  /*
+   *  HAL_RCC_DeInit() above only gates peripheral clocks off - it does
+   *  NOT force a peripheral's internal registers back to their
+   *  power-on-reset values the way asserting its RCC peripheral-reset
+   *  bit does. CAN1 in particular can be left mid-negotiation ( filter
+   *  banks configured, error counters non-zero, bus-off/sleep flags
+   *  set ) from this image's own usage; without an explicit reset here,
+   *  the target image's own CAN init can start against that stale
+   *  state instead of the clean slate a real power-cycle would give it.
+   */
+  __HAL_RCC_CAN1_FORCE_RESET();
+  __HAL_RCC_CAN1_RELEASE_RESET();
+
   SysTick->CTRL = 0;
   SysTick->LOAD = 0;
   SysTick->VAL = 0;
@@ -1363,6 +1376,19 @@ void Bootloader_JumpToColdStart(void)
   /** stop I/O */
   HAL_RCC_DeInit();
   HAL_DeInit();
+
+  /*
+   *  See Bootloader_JumpToApplication() above: HAL_RCC_DeInit() only
+   *  gates peripheral clocks off, it does not force CAN1's internal
+   *  registers back to their power-on-reset values. This is very
+   *  likely THE reason "jump back to ColdStart" recovers Audio's CAN
+   *  link less reliably than an actual power-cycle does - GenBL's own
+   *  CAN_Init() then runs against whatever state P_Util's CAN1 usage
+   *  left behind (filters, error counters, bus-off/sleep flags) rather
+   *  than a clean peripheral.
+   */
+  __HAL_RCC_CAN1_FORCE_RESET();
+  __HAL_RCC_CAN1_RELEASE_RESET();
 
   SysTick->CTRL = 0;
   SysTick->LOAD = 0;

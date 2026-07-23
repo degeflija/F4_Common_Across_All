@@ -376,7 +376,7 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
 
     //  Step 1 : Open the hex input file to be flashed
     //
-    strcpy ( (char*) l_filename, (char*) g_DirListItems[dir_list_index] );
+    strcpy ( (char*)l_filename, (char*)g_DirListItems[dir_list_index] );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -575,7 +575,7 @@ void Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
 
     //  Step 1 : Open the hex input file to be flashed
     //
-    strcpy ( (char*) l_filename, (char*) txt_BLhex );
+    strcpy ( (char*)l_filename, (char*)txt_BLhex );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -719,7 +719,7 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     //  Step 1 :  Open hex file of application to be transferred via CAN
     //            and flashed in remote system
     //
-    strcpy ( (char*) l_filename, (char*) g_DirListItems[dir_list_index] );
+    strcpy ( (char*)l_filename, (char*)g_DirListItems[dir_list_index] );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -733,6 +733,16 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     //
     Start_MDP_on_Remote_Board_via_CAN  ( p_id );
 
+    //  The 0x330 trigger makes the remote satellite board (P_Util) self-jump
+    //  to GenBL's cold start, and GenBL in turn self-jumps too (task_CAN_Bus_Receiver.c,
+    //  BUILD_F4_GenBL branch) -- a real reboot (CAN deinit/reinit, NVIC clear,
+    //  FreeRTOS restart), not an instant handoff. <established> is still true here
+    //  from the heartbeat that was flowing before the trigger; if we don't clear it,
+    //  the "wait for established" guard below is skipped for chunk 0 and we start
+    //  bursting MDP data before the remote side is listening again.
+    //
+    g_CAN_Bus_Util_Data_Xfer_established = false;
+
     Flash_LCtr_OutQItem.Status = c_wait_reboot;
     Flash_LCtr_OutQItem.ToDo = 0;
     Flash_LCtr_OutQItem.Done = 0;
@@ -741,12 +751,17 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
                               portMAX_DELAY );
     ASSERT ( l_q_result == 1 );
 
-#if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_P_UTIL )
+    //  NOTE: this whole function only ever compiles under BUILD_AD57_BL (see
+    //  the outer #if above) and is only ever called with p_id ==
+    //  c_CID_AD57_Requests_Audio_Reboot, i.e. the target is always the
+    //  GenBL/P_Util satellite board -- so the longer settle delay below is
+    //  unconditionally the correct one (a #if(BUILD_F4_GenBL||BUILD_F4_P_UTIL)
+    //  branch here can never be taken, since that macro is never defined in
+    //  a BUILD_AD57_BL build; it used to silently fall through to a bare
+    //  10 ms delay instead).
+    //
     vTaskDelay( 100 );
     vTaskDelay( 2000 );
-#else
-    vTaskDelay( 10 ); // Just to provoke a task switch
-#endif
 
     //  Step 4 :  Loop to read data to be pushed via CAN
     //
@@ -776,14 +791,15 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
       //
       if ( ! g_CAN_Bus_Util_Data_Xfer_established )
       {
-#if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_P_UTIL )
+        //  See NOTE above Step 3: this function only ever runs on BL targeting
+        //  the GenBL/P_Util satellite reboot, so the extra 1000 ms settle margin
+        //  after re-establishing is unconditionally correct here (the
+        //  BUILD_F4_GenBL/BUILD_F4_P_UTIL branch this used to be guarded behind
+        //  could never be taken in a BUILD_AD57_BL build).
+        //
         while ( ! g_CAN_Bus_Util_Data_Xfer_established )
           vTaskDelay( 50 );
         vTaskDelay( 1000 );
-#else
-        while ( ! g_CAN_Bus_Util_Data_Xfer_established )
-          vTaskDelay( 10 );
-#endif
       }
 
       //  Check if magic number resides in this block of flash data
@@ -842,7 +858,7 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_BL ( uint16_t  dir_list_index )
 
     //  Step 1 : Open the hex input file to be flashed
     //
-    strcpy ( (char*) l_filename, (char*) "F4_BL.hex" );
+    strcpy ( (char*)l_filename, (char*)"F4_BL.hex" );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -1094,7 +1110,7 @@ void Appl_on_F4_Read_CAN_Flash_Local_BL ( void )
 
     //  Step 1 : Open the hex input file to be flashed
     //
-    strcpy ( (char*) l_filename, (char*) txt_BLhex );
+    strcpy ( (char*)l_filename, (char*)txt_BLhex );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
