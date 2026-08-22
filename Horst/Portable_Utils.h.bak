@@ -14,7 +14,6 @@
   *           Portable_Utils_Display_NMEA.h (FE + BL only) - see that file
   *           for HexVersion2String(), MapCoordinates2Canvas(),
   *           NMEA_append_tail() and EnforceExtension().
-  *
   * ###########################################################################
   */
 
