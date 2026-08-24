@@ -764,156 +764,191 @@ void portable_uint32_2_hex_str ( uint32_t n, char* res )
 
 }
 
-#define MEASURE_TIME 0
-#if MEASURE_TIME
-uint64_t getTime_usec(void);
-COMMON uint64_t measure;
-#endif
-
-#if 0 // todo klaus fast version
 /* ****************************************************************************
- Converts a floating-point/float number <n> to a string <res> on base 10
- with length <res_len> with given <no_of_decimals>
- padded with prefixed blanks to reach length "len"
- *****************************************************************************/
-void portable_ftoa ( float _value, char* res, unsigned  no_of_decimals, unsigned res_len )
+ *  portable_ftoa()
+ *
+ *  Wandelt <n> in einen String <res> mit <no_of_decimals> Nachkommastellen.
+ *  <res_len> ist die Nutzlaenge; der Puffer muss res_len+1 Bytes gross sein
+ *  ( wie bisher - das memset() unten schreibt res[res_len] = 0 ).
+ *
+ *  Ausgabeformat unveraendert gegenueber der alten Version:
+ *    linksbuendig, kein Vorzeichen bei positiven Werten,
+ *    kein Dezimalpunkt wenn no_of_decimals == 0.
+ *
+ *  Geaendert gegenueber der alten Version:
+ *    - schreibt NIE ueber res[res_len] hinaus ( vorher konnte das strcat()
+ *      am Ende bei zu kleinem res_len mehrere Bytes ueberlaufen )
+ *    - kein strcat(), kein PreFix_Char(), kein portable_itoa() mehr noetig
+ *    - NaN / Inf / Ueberlauf liefern '*'-Fuellung statt undefiniertem Wert
+ *
+ *  ACHTUNG - Entscheidung: passt die Zahl nicht in res_len Zeichen, wird
+ *  komplett mit '*' gefuellt. Das ist Absicht: ein abgeschnittenes "123456"
+ *  statt "123456.78" waere auf der Anzeige nicht als Fehler erkennbar.
+ *  Wer lieber abschneiden will, aendert nur portable_ftoa_Overflow().
+ * ***************************************************************************/
+
+#define FTOA_MAX_DECIMALS   9u          /* 10^9 passt noch in uint32_t */
+
+/* ---------------------------------------------------------------------------
+ *  Puffer komplett mit '*' fuellen ( Zahl passt nicht / ist keine Zahl )
+ * -------------------------------------------------------------------------*/
+static void portable_ftoa_Overflow ( char * res, unsigned res_len )
 {
-    float value = _value;
-    ASSERT( no_of_decimals <= res_len-2);
+  unsigned i;
 
-#if MEASURE_TIME
-    uint64_t start = getTime_usec();
-#endif
+  for ( i = 0; i < res_len; i++ )
+    res[i] = '*';
 
-    unsigned i=no_of_decimals;
-    while( i-- > 0)
-        value *=10.0f;
-
-    int number;
-    char sign;
-
-    if( value < 0.0f)
-    {
-        sign = '-';
-        number = (int)( -value + 0.5f);
-    }
-    else
-        {
-        sign = ' ';
-        number = (int)( value + 0.5f);
-        }
-
-    char * target = res + res_len;
-    *target-- = 0;
-
-    for( i=no_of_decimals; i; --i)
-    {
-        *target-- = number % 10 + '0';
-        number /= 10;
-    }
-
-    *target-- = '.';
-    if( number == 0)
-    {
-        *target -- = '0';
-    }
-    else while(( number > 0) && ( target > res+1))
-    {
-        *target-- = number % 10 + '0';
-        number /= 10;
-    }
-
-    *target-- = sign;
-
-    while( target >= res)
-        *target-- = ' ';
-
-#if MEASURE_TIME
-    measure -= measure >> 8;
-    measure += getTime_usec() - start;
-#endif
+  res[res_len] = 0;
 }
 
-#else
+/* ---------------------------------------------------------------------------
+ *  10 hoch e, e <= 9
+ * -------------------------------------------------------------------------*/
+static uint32_t portable_ftoa_Pow10 ( unsigned e )
+{
+  uint32_t r = 1;
 
-//void portable_ftoa ( double n, char* res, uint8_t no_of_decimals, uint8_t res_len )
-void portable_ftoa ( double n, char* res, unsigned  no_of_decimals, unsigned res_len )
+  while ( e-- > 0 )
+    r *= 10u;
+
+  return r;
+}
+
+/* -------------------------------------------------------------------------*/
+
+void portable_ftoa ( double n, char * res, unsigned no_of_decimals, unsigned res_len )
 {
 #if MEASURE_TIME
-    uint64_t start = getTime_usec();
+  uint64_t start = getTime_usec();
 #endif
 
-  int8_t  sign = 1;     // Plus assumed
-  int32_t  ipart;
-  float    fpart;
-  int32_t  i;
-  uint8_t  len;
-  float     xx = n;
-  uint8_t loc_buffer[10] = {0};
+  double    value;
+  double    scaled;
+  uint32_t  scale;
+  uint32_t  total;
+  uint32_t  ipart;
+  uint32_t  fpart;
+  uint32_t  probe;
+  unsigned  int_digits;
+  unsigned  needed;
+  unsigned  pos;
+  unsigned  d;
+  uint8_t   is_negative = 0;
 
-// -------------------
+  // -------------------  Vorbedingungen
 
-  if ( isinf(n) ) my_break_point;
-  //float  portable_round_2_n_decmls ( float Val1, int Val2 )
+  if ( res == 0 )
+    return;
 
-
-  memset ( (uint8_t *) res, 0, res_len + 1);            // preset output buffer
-
-  if ( xx < 0 )                      // ixxput value is negative
+  if ( res_len == 0 )
   {
-    sign  = -1;
-    xx     = -xx;
+    res[0] = 0;
+    return;
   }
 
-  fpart = 0.5;
-  for ( i = 0; i < no_of_decimals; i++ )
-    fpart = fpart / 10.0;
-  xx += fpart;
+  memset ( (uint8_t *) res, 0, res_len + 1 );     // preset output buffer
 
-  ipart   = (int)xx;                  // Extract integer part
-  fpart   = xx - (float)ipart;            // Extract floating part
-  len     = portable_itoa ( ipart, res, res_len );  // convert integer part to string
+  if ( no_of_decimals > FTOA_MAX_DECIMALS )
+    no_of_decimals = FTOA_MAX_DECIMALS;
 
-  // check for display option after point
-  if (no_of_decimals != 0) {
-    res[portable_strlen(res)] = '.';
-
-    //  Get the value of fraction part up to given no. of decimals.
-    //  The third parameter is needed to handle cases like 233.007
-    //
-    for ( i = 0; i < no_of_decimals; i++ )
-      fpart = fpart * 10;
-    //fpart += 0.5;
-    //uint8_t ll = portable_strlen(res);
-
-    len = portable_itoa ( (int)fpart, (char*)loc_buffer, 10 );  // convert integer part to string
-
-    while ( ( no_of_decimals - len++) > 0 )
-    {
-      PreFix_Char ( '0', (char*)loc_buffer );
-    }
-  }
-  strcat  ( (char*)res, (char*)loc_buffer );
-
-  // if negative
+  // -------------------  NaN und Inf abfangen
   //
-  if ( sign == -1 )              // if negative
+  //  my_break_point haelt nur unter dem Debugger an - im Feld muss trotzdem
+  //  ein definierter String herauskommen, deshalb danach die '*'-Fuellung.
+
+  if ( isnan ( n ) || isinf ( n ) )
   {
-    PreFix_Char ( '-', res );
-    len++;
+    my_break_point;
+    portable_ftoa_Overflow ( res, res_len );
+    goto done;
   }
 
-//  while ( portable_strlen ( res ) < len )
-//  {
-//    PreFix_Char ( ' ', res );
-//  }
+  // -------------------  Vorzeichen abspalten
+
+  value = n;
+
+  if ( value < 0.0 )
+  {
+    is_negative = 1;
+    value       = -value;
+  }
+
+  // -------------------  Runden und in Ganzzahl umrechnen
+  //
+  //  Alles in EINER Ganzzahl ( total ) halten - dadurch kann das Runden
+  //  nicht mehr zwischen Vor- und Nachkommateil auseinanderlaufen
+  //  ( altes Problem: 233.007 mit 2 Stellen ).
+
+  scale  = portable_ftoa_Pow10 ( no_of_decimals );
+  scaled = value * (double) scale + 0.5;
+
+  if ( scaled >= 4294967296.0 )                   // passt nicht in uint32_t
+  {
+    portable_ftoa_Overflow ( res, res_len );
+    goto done;
+  }
+
+  total = (uint32_t) scaled;
+  ipart = total / scale;
+  fpart = total % scale;
+
+  // -------------------  Laenge vorab bestimmen, BEVOR geschrieben wird
+
+  int_digits = 1;
+  probe      = ipart;
+
+  while ( probe >= 10u )
+  {
+    probe /= 10u;
+    int_digits++;
+  }
+
+  needed = int_digits;
+
+  if ( is_negative )
+    needed++;
+
+  if ( no_of_decimals > 0 )
+    needed += 1 + no_of_decimals;                 // '.' plus Nachkommastellen
+
+  if ( needed > res_len )                         // passt nicht -> nicht luegen
+  {
+    portable_ftoa_Overflow ( res, res_len );
+    goto done;
+  }
+
+  // -------------------  Ab hier ist garantiert, dass alles hineinpasst
+
+  pos = 0;
+
+  if ( is_negative )
+    res[pos++] = '-';
+
+  for ( d = int_digits; d > 0; d-- )
+    res[pos++] = (char) ( '0' + ( ( ipart / portable_ftoa_Pow10 ( d - 1 ) ) % 10u ) );
+
+  if ( no_of_decimals > 0 )
+  {
+    res[pos++] = '.';
+
+    for ( d = no_of_decimals; d > 0; d-- )
+      res[pos++] = (char) ( '0' + ( ( fpart / portable_ftoa_Pow10 ( d - 1 ) ) % 10u ) );
+  }
+
+  res[pos] = 0;
+
+done:
+
 #if MEASURE_TIME
-    measure -= measure >> 8;
-    measure += getTime_usec() - start;
+  measure -= measure >> 8;
+  measure += getTime_usec() - start;
 #endif
+
+  return;
 }
 
-#endif
+
 
 // ****************************************************************************
 // portable_itoa2
