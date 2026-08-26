@@ -1237,8 +1237,15 @@ void Bootloader_JumpToApplication(void)
     acquire_privileges();
   #endif
 
-  uint32_t  JumpAddress = *(__IO uint32_t*)(APP_ADDRESS + 4);
-  FPTR program_start = (FPTR)(JumpAddress);
+  //
+  //  NOTE: the entry address is deliberately NOT cached in a local here.
+  //  __set_CONTROL(0) further down switches this thread from PSP to MSP;
+  //  every stack-relative access after that point resolves against the
+  //  MSP stack, so a local written before the switch reads back as
+  //  garbage afterwards ( it produced a plausible-looking but wrong
+  //  flash address and a jump into nowhere ). The vector is therefore
+  //  read straight from flash at the moment of the jump, see below.
+  //
 
   /*  Stop RTOS activity */
   portDISABLE_INTERRUPTS();
@@ -1316,7 +1323,12 @@ void Bootloader_JumpToApplication(void)
 
   __set_MSP(*(__IO uint32_t*) APP_ADDRESS);
   __ISB();
-  program_start();
+  //
+  //  Read the reset vector directly from flash and call it in one
+  //  expression - no stack storage involved, hence immune to the
+  //  PSP -> MSP switch performed above.
+  //
+  ( (FPTR) ( *(__IO uint32_t*)( APP_ADDRESS + 4 ) ) )();
 }
 
 //
@@ -1330,8 +1342,10 @@ void Bootloader_JumpToColdStart(void)
     acquire_privileges();
   #endif
 
-  uint32_t  JumpAddress = *(__IO uint32_t*)(COLD_START_ADDRESS + 4);
-  FPTR program_start = (FPTR)(JumpAddress);
+  //
+  //  See Bootloader_JumpToApplication(): the entry address must not be
+  //  carried across the __set_CONTROL(0) PSP -> MSP switch in a local.
+  //
 
   /*  Stop RTOS activity */
   portDISABLE_INTERRUPTS();
@@ -1398,7 +1412,10 @@ void Bootloader_JumpToColdStart(void)
 
   __set_MSP(*(__IO uint32_t*) COLD_START_ADDRESS);
   __ISB();
-  program_start();
+  //
+  //  Vector read straight from flash at jump time, no stack involved.
+  //
+  ( (FPTR) ( *(__IO uint32_t*)( COLD_START_ADDRESS + 4 ) ) )();
 
 }
 
