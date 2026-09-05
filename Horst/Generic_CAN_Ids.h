@@ -184,6 +184,7 @@
     c_CID_AD57_GRAB_CONTROL     = 0x322,    //!< !!!!!!!!!!!!!!!!!!!
     c_CID_AD57_LOST_CONTROL     = 0x322,    //!< !!!!!!!!!!!!!!!!!!!
     c_CID_AD57_SYNC_PARAMETER   = 0x323,    //!< sync parameters on slave
+    c_CID_AD57_SYNC_FlightMode  = 0x324,    //!< sync parameters on slave
 
 
     /*

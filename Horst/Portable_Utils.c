@@ -2200,10 +2200,36 @@ uint32_t  Portable_IntraDay_TimeDiff ( uint32_t date_time_2, uint32_t date_time_
 //
 float Calc_Tau ( float tau, uint16_t  rep_period )
 {
-  if ( tau == 0.0 )
+  float l_alpha;
+
+  //
+  //  tau <= 0  ==>  filter switched off, the new value passes through 1:1.
+  //
+  //  Written as ! ( tau > 0.0 ) on purpose : this also catches a tau that
+  //  is NaN, because every comparison against NaN is false.
+  //
+  if ( ! ( tau > 0.0 ) )
     return 1.0;
-  else
-    return ( (float) rep_period / ( 1000.0 * tau ) );
+
+  l_alpha = (float) rep_period / ( 1000.0 * tau );
+
+  //
+  //  An alpha > 1.0 makes the caller's filter
+  //
+  //      new = old * ( 1 - alpha ) + input * alpha
+  //
+  //  overshoot instead of damping : ( 1 - alpha ) becomes negative, the
+  //  value flips sign every cycle with growing amplitude, runs into
+  //  +/- inf within a few seconds - and from then on every further
+  //  multiplication produces NaN, which never heals again.
+  //
+  //  alpha == 1.0 means "no filtering", which is the sanest thing that can
+  //  happen for a tau that is shorter than the repetition period anyway.
+  //
+  if ( l_alpha > 1.0 )
+    l_alpha = 1.0;
+
+  return l_alpha;
 }
 
 // *****************************************************************************
