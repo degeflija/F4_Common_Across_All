@@ -577,7 +577,24 @@ void Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
     //
     strcpy ( (char*)l_filename, (char*)txt_BLhex );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
-    ASSERT ( l_sd_result == SD_OK );
+    //
+    //  Laesst sich die Datei nicht oeffnen, wird NICHT geflasht.
+    //
+    //  Hier stand nur eine ASSERT. Die konnte gar nicht ansprechen, weil
+    //  SD_Card_File_Open_4_Read() in der FE-Fassung bis vor kurzem
+    //  unbedingt SD_OK zurueckgab - der Ablauf lief also weiter, loeschte in
+    //  Schritt 5 die Sektoren des BootLoaders und schrieb anschliessend den
+    //  Inhalt einer nie geoeffneten Datei hinein. Eine fehlende BL.hex oder
+    //  eine kranke Karte haetten damit den BootLoader zerstoert.
+    //
+    //  Seit SD_Card_File_Open_4_Read() das echte Ergebnis liefert, wird hier
+    //  abgebrochen - bevor irgendein Sektor angefasst wird.
+    //
+    if ( l_sd_result != SD_OK )
+    {
+      g_ProgramStatus.IsInError = 1;
+      return;
+    }
 
     //  Step 2 : Retrieve size of hex input file to be flashed
     //
