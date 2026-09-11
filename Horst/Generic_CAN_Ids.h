@@ -222,8 +222,43 @@
     c_CID_SNN_Heartbeat_GNSS    = 0x540,
     c_CID_SNN_Heartbeat_IMU     = 0x560,
 
+    //
+    //  Configuration
+    //
+    c_CID_SNN_Set_Config_Item   = 0x402,    //!< uint16_t item id + uint16_t value
+                                            //!< data_h[0] = item id  ( CMD_... / ITEM_... )
+                                            //!< data_h[1] = value    ( 0 bei reinen Kommandos )
+                                            //!< dlc = 4
 
   };
+
+  //
+  //  **** Item-IDs fuer c_CID_SNN_Set_Config_Item ( 0x402 ) *******************
+  //
+  //  Nutzlast : data_h[0] = Item-ID, data_h[1] = Wert, dlc = 4
+  //
+  //  Die CMD_-Codes sind reine Ausloeser, ihr Wert-Feld bleibt 0.
+  //  Die ITEM_-Codes tragen im Wert-Feld den zu setzenden Parameter.
+  //
+  #define CMD_MEASURE_LEFT      0x3000    //  Messung 1 : linke Flaeche unten
+  #define CMD_MEASURE_RIGHT     0x3001    //  Messung 2 : rechte Flaeche unten
+  #define CMD_MEASURE_LEVEL     0x3002    //  Messung 3 : Flaechen waagerecht
+  #define CMD_CALCULATE         0x3003    //  Einbaulage rechnen und speichern
+  #define CMD_TUNE              0x3004    //  Feinabgleich im Flug
+  #define CMD_RESET_SENSOR      0x3005    //  Sensorbox zuruecksetzen
+
+  //
+  //  !!! TODO !!!
+  //
+  //  Die Item-ID fuer ANT_SLAVE_RIGHT ( Lage des Slave-Sensors bei DGNSS )
+  //  ist auf der Sensorbox-Seite noch nicht festgelegt. Solange hier
+  //  c_Item_Id_Undefined steht, weigert sich das Frontend, den Wert zu
+  //  senden ( siehe Sensor_SetUp_Lib.c ) - es meldet das mit Alarmton
+  //  statt stillschweigend ein falsches Paket auf den Bus zu legen.
+  //
+  #define c_Item_Id_Undefined   0xFFFF
+  #define ITEM_ANT_SLAVE_RIGHT  c_Item_Id_Undefined
+
 
 #endif  // __Generic_CAN_Ids_h
 // ****************************************************************************

@@ -376,7 +376,29 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
 
     //  Step 1 : Open the hex input file to be flashed
     //
-    strcpy ( (char*)l_filename, (char*)g_DirListItems[dir_list_index] );
+    //
+    //  LINT-Fix A1 : <dir_list_index> kommt aus der Cursorposition der MMI und
+    //  war hier ungeprueft. g_DirListItems hat nur c_max_dirlistitems Zeilen;
+    //  ein zu grosser Index las weit hinter dem Array, und das anschliessende
+    //  strcpy() lief dann ohne Laengenbegrenzung in l_filename[256].
+    //  Die MMI prueft inzwischen selbst -- das hier ist die zweite Schranke,
+    //  weil diese Funktion aus dem Common-Tier heraus aufgerufen wird.
+    //
+    if ( dir_list_index >= c_max_dirlistitems )
+    {
+      Flash_LCtr_OutQItem.Status = c_flash_slot_empty;
+      l_q_result = xQueueSend ( Flash_LCtr_OutQId,
+                                &Flash_LCtr_OutQItem,
+                                portMAX_DELAY );
+      ASSERT ( l_q_result == 1 );
+      return;
+    }
+
+    //
+    //  laengenbegrenzt kopieren statt strcpy(), und sicher terminieren
+    //
+    memcpy ( l_filename, g_DirListItems[dir_list_index], c_filename_size );
+    l_filename[c_filename_size] = 0;
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -397,6 +419,14 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
                                 &Flash_LCtr_OutQItem,
                                 portMAX_DELAY );
       ASSERT ( l_q_result == 1 );
+      //
+      //  LINT-Fix 5 : hier fehlte das return. Der Zweig meldete, dass die
+      //  Hex-Datei nicht in den Flash passt, und fing danach trotzdem an,
+      //  Sektoren zu loeschen -- am Ende stand eine halb geloeschte Anwendung
+      //  im oberen Flash.
+      //
+      SD_Card_File_Close ( &hex_input_file );
+      return;
     }
     //  Step 5 : Loop to erase sectors
     //
@@ -736,7 +766,29 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     //  Step 1 :  Open hex file of application to be transferred via CAN
     //            and flashed in remote system
     //
-    strcpy ( (char*)l_filename, (char*)g_DirListItems[dir_list_index] );
+    //
+    //  LINT-Fix A1 : <dir_list_index> kommt aus der Cursorposition der MMI und
+    //  war hier ungeprueft. g_DirListItems hat nur c_max_dirlistitems Zeilen;
+    //  ein zu grosser Index las weit hinter dem Array, und das anschliessende
+    //  strcpy() lief dann ohne Laengenbegrenzung in l_filename[256].
+    //  Die MMI prueft inzwischen selbst -- das hier ist die zweite Schranke,
+    //  weil diese Funktion aus dem Common-Tier heraus aufgerufen wird.
+    //
+    if ( dir_list_index >= c_max_dirlistitems )
+    {
+      Flash_LCtr_OutQItem.Status = c_flash_slot_empty;
+      l_q_result = xQueueSend ( Flash_LCtr_OutQId,
+                                &Flash_LCtr_OutQItem,
+                                portMAX_DELAY );
+      ASSERT ( l_q_result == 1 );
+      return;
+    }
+
+    //
+    //  laengenbegrenzt kopieren statt strcpy(), und sicher terminieren
+    //
+    memcpy ( l_filename, g_DirListItems[dir_list_index], c_filename_size );
+    l_filename[c_filename_size] = 0;
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     ASSERT ( l_sd_result == SD_OK );
 
@@ -1648,9 +1700,7 @@ void F4_Write_Signature_Sector_7 ( AppSignature_t * Signature )
 //  section's ALIGN(256) in the linker script, combined with APP_ADDRESS
 //  (0x08080000) itself being 256-byte aligned.
 //
-extern uint32_t ThisApplicationsSignature[4];   // defined in Generic_Signature.c
-                                                 // (remove this line if Generic_Signature.h
-                                                 //  already declares it -- avoids a duplicate)
+extern uint32_t ThisApplicationsSignature[4];
 
 void Generic_Signature_SelfSign ( void )
 {
