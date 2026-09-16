@@ -812,9 +812,12 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     //
     g_CAN_Bus_Util_Data_Xfer_established = false;
 
-    Flash_LCtr_OutQItem.Status = c_wait_reboot;
-    Flash_LCtr_OutQItem.ToDo = 0;
-    Flash_LCtr_OutQItem.Done = 0;
+    MDP_Reset_Repeat_Count ( );
+
+    Flash_LCtr_OutQItem.Status  = c_wait_reboot;
+    Flash_LCtr_OutQItem.ToDo    = 0;
+    Flash_LCtr_OutQItem.Done    = 0;
+    Flash_LCtr_OutQItem.Repeats = 0;
     l_q_result = xQueueSend ( Flash_LCtr_OutQId,
                               &Flash_LCtr_OutQItem,
                               portMAX_DELAY );
@@ -879,16 +882,36 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
       //
       // After <l_Magic_No_Found> there is only one more data xfer
       //
-      MDP_Send_Data_via_CAN ( p_id + 0x10, buffer1.u8, c_buffer_size );
+      //  16.09.2026 : MDP_Send_Data_via_CAN wiederholt verlorene Rahmen selbst
+      //  und liefert false erst, wenn alle Wiederholungen erschoepft sind.
+      //  Dann Abbruch mit Meldung ; der Aufrufer ( task_Flash_Loop_Control )
+      //  springt anschliessend wie nach einem fertigen Flash in die Anwendung.
+      //
+      if ( ! MDP_Send_Data_via_CAN ( p_id + 0x10, buffer1.u8, c_buffer_size ) )
+      {
+        Flash_LCtr_OutQItem.Status  = c_flash_transfer_failure;
+        Flash_LCtr_OutQItem.ToDo    = l_filesize;
+        Flash_LCtr_OutQItem.Done    = l_count_size;
+        Flash_LCtr_OutQItem.Repeats = MDP_Get_Repeat_Count ( );
+        l_q_result = xQueueSend ( Flash_LCtr_OutQId,
+                                  &Flash_LCtr_OutQItem,
+                                  portMAX_DELAY );
+        ASSERT ( l_q_result == 1 );
+
+        (void) SD_Card_File_Close ( &hex_input_file );
+        vTaskDelay ( 10000 );     //  Meldung stehen lassen
+        return;
+      }
       //
       //  This bunch will xfer the magic number,
       //  so the receiving side does not expect any more data xfers after that.
 
       l_count_size += l_bytesread;
 
-        Flash_LCtr_OutQItem.Status = c_flash_progress;
-        Flash_LCtr_OutQItem.ToDo = l_filesize;
-        Flash_LCtr_OutQItem.Done = l_count_size;
+        Flash_LCtr_OutQItem.Status  = c_flash_progress;
+        Flash_LCtr_OutQItem.ToDo    = l_filesize;
+        Flash_LCtr_OutQItem.Done    = l_count_size;
+        Flash_LCtr_OutQItem.Repeats = MDP_Get_Repeat_Count ( );
         l_q_result = xQueueSend ( Flash_LCtr_OutQId,
                                   &Flash_LCtr_OutQItem,
                                   portMAX_DELAY );
@@ -990,7 +1013,14 @@ void BL_on_F4_Read_CAN_Flash_Local_Appl ( void )
   #if ( defined BUILD_F4_GenBL )
   {
     uint16_t    l_result = 0;
-    uint32_t    l_bytesread = 0;
+    //
+    //  FIX 16.09.2026 : <l_bytesread> stand fest auf 0 und wurde nie
+    //  gesetzt - Speichervergleich ( 4d ) und beide CRCs ( 4e / 4f ) liefen
+    //  ueber 0 Bytes, die Verifikation hat nie etwas geprueft. Jeder Block
+    //  ist hier genau c_buffersize_inbytes gross ( MDP_Receive_Data_via_CAN
+    //  fuellt immer den ganzen Puffer ).
+    //
+    uint32_t    l_bytesread = c_buffersize_inbytes;
     buffer_t    buffer1;
     buffer_t    l_buffer;
     uint16_t    l_crc_1 = 0;
@@ -1147,10 +1177,18 @@ void BL_on_F4_Read_CAN_Flash_Local_Appl ( void )
 
     //  .......................................................................
     //
-    //  buffer1 contains signature data
-    //  Store that buffer into last flash region of lower address space
+    //  Sektor 7 wird nicht mehr beschrieben.
     //
-    F4_Write_Signature_Sector_7 ( (AppSignature_t *) l_buffer.u32 );
+    //  Der Boot-Entscheid haengt nur noch an der selbstsignierten
+    //  In-Image-Signatur ( siehe Check_Application_In_Upper_Address_Space
+    //  und Generic_Signature_SelfSign ). F4_Write_Signature_Sector_7 ist
+    //  weiter unten bereits auskommentiert - dieser Aufruf war der letzte
+    //  Rest davon und liess F4_GenBL nicht mehr linken :
+    //  "undefined reference to F4_Write_Signature_Sector_7".
+    //
+    //  13.09.2026
+    //
+    //F4_Write_Signature_Sector_7 ( (AppSignature_t *) l_buffer.u32 );
 
   }
   #endif
@@ -1163,133 +1201,133 @@ void BL_on_F4_Read_CAN_Flash_Local_Appl ( void )
 //
 //  11.  Appl on F4, read from CAN, flash local BL
 //
-void Appl_on_F4_Read_CAN_Flash_Local_BL ( void )
-{
-  #if ( defined BUILD_F4_P_UTIL_ )    // TODO
-  {
-    uint16_t    l_sd_result;
-    uint16_t    l_result = 0;
-    uint32_t    l_bytesread = 0;
-    buffer_t    buffer1;
-    buffer_t    l_buffer;
-    uint8_t     l_feof;
-    uint32_t    l_count_size = 0;
-    uint16_t    l_crc = 0;
-    uint32_t    l_filesize;
-
-    //  Step 1 : Open the hex input file to be flashed
-    //
-    strcpy ( (char*)l_filename, (char*)txt_BLhex );
-    l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
-    ASSERT ( l_sd_result == SD_OK );
-
-    //  Step 2 : Retrieve size of hex input file to be flashed
-    //
-    uint32_t  l_filesize = SD_Card_File_Size ( &hex_input_file );
-
-    //  Step 3 : Set flasher module internal addresses
-    //
-    uint32_t  l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_min_lower_addr_space_sector );
-
-    //  Step 4 : Check if hex file fits into flashable space
-    //
-    if ( l_filesize > l_flashable_space )
-    {
-    }
-    //  Step 5 : Loop to erase sectors
-    //
-    for (uint8_t i = c_min_lower_addr_space_sector; i <= c_max_lower_addr_space_sector; i++ )
-    {
-      Flash_F4xx_EraseSector( i );
-
-      vTaskDelay( 1 );
-    }
-
-    //  Step 6 : Flash Programming
-    //
-    //vTaskDelay( 10 );
-
-    //  Loop to read data to be flashed
-    //
-    l_feof  = 0;
-
-    while ( l_feof == 0 )
-    {
-      //
-      //  read bytewise in chunks of c_buffer_size bytes
-      //
-      l_sd_result = SD_Card_File_Read ( &hex_input_file,
-                                        buffer1.u8,
-                                        c_buffer_size,
-                                        &l_bytesread );
-      ASSERT ( ( l_sd_result == SD_OK ) || ( l_sd_result == SD_EOF ) );
-      if ( l_bytesread == 0 )
-          l_feof = 1;
-      else
-      {
-        //
-        //  and flash that chunk of data
-        //
-        acquire_privileges();
-        Flash_F4xx_Write ( buffer1.u32, l_bytesread/4 );    // write uint32_t
-        drop_privileges();
-
-        l_count_size += l_bytesread;
-
-        vTaskDelay( 1 );
-        //
-        //  Then read that chunk of data again from flash and compare with original input
-        //
-        acquire_privileges();
-        Flash_F4xx_Read ( l_buffer.u32, l_bytesread/4 );        // read uint32_t
-        drop_privileges();
-        l_result = portable_memcmp (  (uint8_t *) buffer1.u8,
-                                      (uint8_t *) l_buffer.u8,
-                                      l_bytesread );
-        if ( l_result != 0 )
-        {
-          //
-          //  verification failure
-          //
-          ASSERT ( l_result == 0 );
-        }
-
-        //
-        //  check CRC
-        //
-        if ( l_bytesread != sizeof ( AppSignature_t ) )
-        {
-          //
-          //  checking all other chunks but last (normal case)
-          //
-          l_crc = CRC16_blockcheck_bytes( (uint8_t*) l_buffer.u8,
-                                          l_crc,
-                                          l_bytesread );
-        }
-        else
-        {
-          //
-          //  checking last chunk which holds the signature
-          //
-          l_crc = CRC16_blockcheck_bytes (  (uint8_t*) l_buffer.u8,
-                                            l_crc,
-                                            l_bytesread-4 );
-          //l_bytesread = 23;
-          l_crc = l_crc - l_buffer.u32[3];
-        }
-      }
-    }
-
-    if (l_crc != 0 )
-    {
-      ASSERT ( l_crc == 0 );
-    }
-
-    /* Step 8 : Finalize Programming */
-    l_sd_result = SD_Card_File_Close ( &hex_input_file );
-  }
-  #endif
-}
+//void Appl_on_F4_Read_CAN_Flash_Local_BL ( void )
+//{
+//  #if ( defined BUILD_F4_P_UTIL_ )    // TODO
+//  {
+//    uint16_t    l_sd_result;
+//    uint16_t    l_result = 0;
+//    uint32_t    l_bytesread = 0;
+//    buffer_t    buffer1;
+//    buffer_t    l_buffer;
+//    uint8_t     l_feof;
+//    uint32_t    l_count_size = 0;
+//    uint16_t    l_crc = 0;
+//    uint32_t    l_filesize;
+//
+//    //  Step 1 : Open the hex input file to be flashed
+//    //
+//    strcpy ( (char*)l_filename, (char*)txt_BLhex );
+//    l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
+//    ASSERT ( l_sd_result == SD_OK );
+//
+//    //  Step 2 : Retrieve size of hex input file to be flashed
+//    //
+//    uint32_t  l_filesize = SD_Card_File_Size ( &hex_input_file );
+//
+//    //  Step 3 : Set flasher module internal addresses
+//    //
+//    uint32_t  l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_min_lower_addr_space_sector );
+//
+//    //  Step 4 : Check if hex file fits into flashable space
+//    //
+//    if ( l_filesize > l_flashable_space )
+//    {
+//    }
+//    //  Step 5 : Loop to erase sectors
+//    //
+//    for (uint8_t i = c_min_lower_addr_space_sector; i <= c_max_lower_addr_space_sector; i++ )
+//    {
+//      Flash_F4xx_EraseSector( i );
+//
+//      vTaskDelay( 1 );
+//    }
+//
+//    //  Step 6 : Flash Programming
+//    //
+//    //vTaskDelay( 10 );
+//
+//    //  Loop to read data to be flashed
+//    //
+//    l_feof  = 0;
+//
+//    while ( l_feof == 0 )
+//    {
+//      //
+//      //  read bytewise in chunks of c_buffer_size bytes
+//      //
+//      l_sd_result = SD_Card_File_Read ( &hex_input_file,
+//                                        buffer1.u8,
+//                                        c_buffer_size,
+//                                        &l_bytesread );
+//      ASSERT ( ( l_sd_result == SD_OK ) || ( l_sd_result == SD_EOF ) );
+//      if ( l_bytesread == 0 )
+//          l_feof = 1;
+//      else
+//      {
+//        //
+//        //  and flash that chunk of data
+//        //
+//        acquire_privileges();
+//        Flash_F4xx_Write ( buffer1.u32, l_bytesread/4 );    // write uint32_t
+//        drop_privileges();
+//
+//        l_count_size += l_bytesread;
+//
+//        vTaskDelay( 1 );
+//        //
+//        //  Then read that chunk of data again from flash and compare with original input
+//        //
+//        acquire_privileges();
+//        Flash_F4xx_Read ( l_buffer.u32, l_bytesread/4 );        // read uint32_t
+//        drop_privileges();
+//        l_result = portable_memcmp (  (uint8_t *) buffer1.u8,
+//                                      (uint8_t *) l_buffer.u8,
+//                                      l_bytesread );
+//        if ( l_result != 0 )
+//        {
+//          //
+//          //  verification failure
+//          //
+//          ASSERT ( l_result == 0 );
+//        }
+//
+//        //
+//        //  check CRC
+//        //
+//        if ( l_bytesread != sizeof ( AppSignature_t ) )
+//        {
+//          //
+//          //  checking all other chunks but last (normal case)
+//          //
+//          l_crc = CRC16_blockcheck_bytes( (uint8_t*) l_buffer.u8,
+//                                          l_crc,
+//                                          l_bytesread );
+//        }
+//        else
+//        {
+//          //
+//          //  checking last chunk which holds the signature
+//          //
+//          l_crc = CRC16_blockcheck_bytes (  (uint8_t*) l_buffer.u8,
+//                                            l_crc,
+//                                            l_bytesread-4 );
+//          //l_bytesread = 23;
+//          l_crc = l_crc - l_buffer.u32[3];
+//        }
+//      }
+//    }
+//
+//    if (l_crc != 0 )
+//    {
+//      ASSERT ( l_crc == 0 );
+//    }
+//
+//    /* Step 8 : Finalize Programming */
+//    l_sd_result = SD_Card_File_Close ( &hex_input_file );
+//  }
+//  #endif
+//}
 
 // *****************************************************************************
 //
@@ -1493,158 +1531,158 @@ void Bootloader_JumpToColdStart(void)
 //
 //  16. Check Signature in upper-most sector of lower address space
 //
-uint16_t F4_Check_Signature_Sector_7 ( void )
-{
-  uint16_t    l_health = c_ok;
-
-  #ifdef BUILD_F4_GenBL
-  {
-    //uint16_t    l_q_result;
-    buffer_t    buffer1;
-    buffer_t    l_buffer;
-    uint32_t    l_bytesread;
-    //uint16_t    l_crc = 0;
-    //uint32_t    l_size_of_flash_data = 0;
-    uint8_t     l_magic_number_found_in_flash = false;
-    uint32_t    l_max_block_count;
-    uint32_t    l_block_count = 0;
-
-    //  Set flasher module internal addresses for application in upper space
-    //
-    uint32_t l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_min_upper_addr_space_sector ); // 0x08080000
-
-    //  Size in blocks
-    //
-    l_max_block_count = ( l_flashable_space / c_buffer_size );
-
-    //  Loop to read data from upper memory flash until magic number is found
-    //
-    l_bytesread = c_buffer_size;
-    while ( ! l_magic_number_found_in_flash )
-    {
-      //  read bytewise in chunks of c_buffer_size
-      //
-      #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ) )
-        acquire_privileges();
-      #endif
-
-      Flash_F4xx_Read ( buffer1.u32, c_buffersize_in32bit );
-
-      #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ) )
-        drop_privileges();
-      #endif
-
-      // beware of overflow  // TODO
-      //
-      l_block_count++;
-      if ( l_block_count >= l_max_block_count )
-      {
-        l_health = c_nok;
-        return l_health;
-      }
-
-      //  Check if magic number resides in this block of flash data
-      //
-      if ( buffer1.usign.sMagicNumber == c_Magic_Number )
-      {
-        l_magic_number_found_in_flash = true;
-      }
-    }
-
-    //  Set flasher module internal addresses in last segment of lower space
-    //
-    l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector ); // TODO #2#2#2#2#2
-
-    //  READ bytewise in chunks of c_buffer_size
-    //
-    #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
-      acquire_privileges();
-    #endif
-
-    Flash_F4xx_Read ( l_buffer.u32, c_buffersize_in32bit );        // read uint32_t
-
-    #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
-      drop_privileges();
-    #endif
-
-    //  Check if magic number resides in this block of flash data
-    //
-    if ( l_buffer.usign.sMagicNumber != c_Magic_Number )
-    {
-      l_health = c_nok;
-      return l_health;
-    }
-
-    //  Check if versions are alike
-    //
-    if ( buffer1.usign.sVersion != l_buffer.usign.sVersion  )
-    {
-      l_health = c_nok;
-      return l_health;
-    }
-  }
-  #endif
-  return l_health;
-}
+//uint16_t F4_Check_Signature_Sector_7 ( void )
+//{
+//  uint16_t    l_health = c_ok;
 //
-// *****************************************************************************
-// *****************************************************************************
-// *****************************************************************************
+//  #ifdef BUILD_F4_GenBL
+//  {
+//    //uint16_t    l_q_result;
+//    buffer_t    buffer1;
+//    buffer_t    l_buffer;
+//    uint32_t    l_bytesread;
+//    //uint16_t    l_crc = 0;
+//    //uint32_t    l_size_of_flash_data = 0;
+//    uint8_t     l_magic_number_found_in_flash = false;
+//    uint32_t    l_max_block_count;
+//    uint32_t    l_block_count = 0;
 //
-//  17.  On F4, write Signature into last sector of lower address space
+//    //  Set flasher module internal addresses for application in upper space
+//    //
+//    uint32_t l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_min_upper_addr_space_sector ); // 0x08080000
 //
-void F4_Write_Signature_Sector_7 ( AppSignature_t * Signature )
-{
-  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_P_UTIL )
-  {
-    //
-    //  Set sector addresses for
-    //  last flash region of lower address space
-    //  <<My_CurrentFlashWritePosition> -- <<My_CurrentFlashReadPosition>>
-    //
-    Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector ); // TODO #1#1#1#1
-
-    //  Perform erasing on that sector
-    //
-    Flash_F4xx_EraseSector( c_max_lower_addr_space_sector );
-
-    // WRITE signature
-    //
-    #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
-      acquire_privileges();
-    #endif
-
-    Flash_F4xx_Write ( Signature, c_Size_Signature );
-
-    #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
-      drop_privileges();
-    #endif
-
-    #ifdef FLASH_READ_BACK
-      // READ the chunk containing signature again
-      //
-      #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
-        acquire_privileges();
-      #endif
-      for ( uint8_t i = 0; i < c_Size_Signature; i++ )
-      {
-        Signature->sMagicNumber = 0;
-        Signature->sVersion     = 0;
-        Signature->sSizeInBytes = 0;
-        Signature->sC_R_C       = 0;
-      }
-
-      Flash_F4xx_Read ( Signature, c_buffersize_in32bit );
-
-      #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
-        drop_privileges();
-      #endif
-    #endif
-
-    vTaskDelay( 1000 );
-  }
-  #endif
-}
+//    //  Size in blocks
+//    //
+//    l_max_block_count = ( l_flashable_space / c_buffer_size );
+//
+//    //  Loop to read data from upper memory flash until magic number is found
+//    //
+//    l_bytesread = c_buffer_size;
+//    while ( ! l_magic_number_found_in_flash )
+//    {
+//      //  read bytewise in chunks of c_buffer_size
+//      //
+//      #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ) )
+//        acquire_privileges();
+//      #endif
+//
+//      Flash_F4xx_Read ( buffer1.u32, c_buffersize_in32bit );
+//
+//      #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ) )
+//        drop_privileges();
+//      #endif
+//
+//      // beware of overflow  // TODO
+//      //
+//      l_block_count++;
+//      if ( l_block_count >= l_max_block_count )
+//      {
+//        l_health = c_nok;
+//        return l_health;
+//      }
+//
+//      //  Check if magic number resides in this block of flash data
+//      //
+//      if ( buffer1.usign.sMagicNumber == c_Magic_Number )
+//      {
+//        l_magic_number_found_in_flash = true;
+//      }
+//    }
+//
+//    //  Set flasher module internal addresses in last segment of lower space
+//    //
+//    l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector ); // TODO #2#2#2#2#2
+//
+//    //  READ bytewise in chunks of c_buffer_size
+//    //
+//    #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
+//      acquire_privileges();
+//    #endif
+//
+//    Flash_F4xx_Read ( l_buffer.u32, c_buffersize_in32bit );        // read uint32_t
+//
+//    #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
+//      drop_privileges();
+//    #endif
+//
+//    //  Check if magic number resides in this block of flash data
+//    //
+//    if ( l_buffer.usign.sMagicNumber != c_Magic_Number )
+//    {
+//      l_health = c_nok;
+//      return l_health;
+//    }
+//
+//    //  Check if versions are alike
+//    //
+//    if ( buffer1.usign.sVersion != l_buffer.usign.sVersion  )
+//    {
+//      l_health = c_nok;
+//      return l_health;
+//    }
+//  }
+//  #endif
+//  return l_health;
+//}
+////
+//// *****************************************************************************
+//// *****************************************************************************
+//// *****************************************************************************
+////
+////  17.  On F4, write Signature into last sector of lower address space
+////
+//void F4_Write_Signature_Sector_7 ( AppSignature_t * Signature )
+//{
+//  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_P_UTIL )
+//  {
+//    //
+//    //  Set sector addresses for
+//    //  last flash region of lower address space
+//    //  <<My_CurrentFlashWritePosition> -- <<My_CurrentFlashReadPosition>>
+//    //
+//    Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector ); // TODO #1#1#1#1
+//
+//    //  Perform erasing on that sector
+//    //
+//    Flash_F4xx_EraseSector( c_max_lower_addr_space_sector );
+//
+//    // WRITE signature
+//    //
+//    #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
+//      acquire_privileges();
+//    #endif
+//
+//    Flash_F4xx_Write ( Signature, c_Size_Signature );
+//
+//    #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
+//      drop_privileges();
+//    #endif
+//
+//    #ifdef FLASH_READ_BACK
+//      // READ the chunk containing signature again
+//      //
+//      #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
+//        acquire_privileges();
+//      #endif
+//      for ( uint8_t i = 0; i < c_Size_Signature; i++ )
+//      {
+//        Signature->sMagicNumber = 0;
+//        Signature->sVersion     = 0;
+//        Signature->sSizeInBytes = 0;
+//        Signature->sC_R_C       = 0;
+//      }
+//
+//      Flash_F4xx_Read ( Signature, c_buffersize_in32bit );
+//
+//      #if ( ( defined BUILD_AD57_FE ) || ( defined BUILD_AD57_BL ))
+//        drop_privileges();
+//      #endif
+//    #endif
+//
+//    vTaskDelay( 1000 );
+//  }
+//  #endif
+//}
 
 //
 // *****************************************************************************
@@ -1796,25 +1834,25 @@ void Generic_Signature_SelfSign ( void )
 //
 //  18.  On F4, clear Signature in last sector of lower address space
 //
-void F4_Clear_Signature_Sector_7 ( void )
-{
-  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_P_UTIL )
-  {
-    //
-    //  Set sector addresses for wipe clear function
-    //  last flash region of lower address space
-    //  <<My_CurrentFlashWritePosition> -- <<My_CurrentFlashReadPosition>>
-    //
-    Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector );
-
-    //  Perform erasing on that sector
-    //
-    Flash_F4xx_EraseSector( c_max_lower_addr_space_sector );
-
-    vTaskDelay( 1000 );
-  }
-  #endif
-}
+//void F4_Clear_Signature_Sector_7 ( void )
+//{
+//  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_P_UTIL )
+//  {
+//    //
+//    //  Set sector addresses for wipe clear function
+//    //  last flash region of lower address space
+//    //  <<My_CurrentFlashWritePosition> -- <<My_CurrentFlashReadPosition>>
+//    //
+//    Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector );
+//
+//    //  Perform erasing on that sector
+//    //
+//    Flash_F4xx_EraseSector( c_max_lower_addr_space_sector );
+//
+//    vTaskDelay( 1000 );
+//  }
+//  #endif
+//}
 
 //
 // *****************************************************************************

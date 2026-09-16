@@ -138,7 +138,7 @@
   //
   //  11.  Appl on F4, read from CAN, flash local BL
   //
-  void Appl_on_F4_Read_CAN_Flash_Local_BL ( void );   // TODO
+  //void Appl_on_F4_Read_CAN_Flash_Local_BL ( void );   // TODO
 
   //  **************************************************************************
   //
@@ -154,11 +154,17 @@
   //
   //  16. Check Signature
   //
-  uint16_t F4_Check_Signature_Sector_7 ( void );
+  //  Definition auskommentiert - Sektor 7 ist fuer den Boot-Entscheid
+  //  ohne Bedeutung. Deklaration mit stillgelegt, damit niemand die
+  //  Funktion versehentlich wieder aufruft.
+  //
+  //uint16_t F4_Check_Signature_Sector_7 ( void );
 
   //  17.  BL on F4, write Signature into last sector of lower address space
   //
-  void F4_Write_Signature_Sector_7 ( AppSignature_t * Signature );
+  //  Definition auskommentiert - siehe oben.
+  //
+  //void F4_Write_Signature_Sector_7 ( AppSignature_t * Signature );
 
   //  17b. On F4, recompute a real CRC over the resident app image and
   //       self-sign sector 7 with it -- for debugger-flashed images that
@@ -168,7 +174,7 @@
 
   //  18.  BL on F4, write Signature into last sector of lower address space
   //
-  void F4_Clear_Signature_Sector_7 ( void );
+//  void F4_Clear_Signature_Sector_7 ( void );
 
   //  nn. Check upper address space for proper app
   //
