@@ -133,6 +133,10 @@
     c_CID_UTL_Humidity          = 0x204,    //!< unit32_t as float hum * 1000
     c_CID_UTL_Pressure          = 0x205,    //!< unit32_t as float press * 1000
     c_CID_UTL_Flaps_Data        = 0x206,    //!< uint16_t position [percent * 100]
+    c_CID_UTL_Request_AD57_Reboot = 0x207,  //!< 19.09.2026 : Neustart aller AD57 am Bus
+                                            //!< ausgeloest durch einen Taster am Audio
+                                            //!< uint8_t c_UTL_Reboot_Magic, dlc = 1
+                                            //!< ( jeder andere Inhalt wird ignoriert )
 
     //
     //  CAN packages with source AD57
@@ -231,6 +235,13 @@
 
   };
 
+  //
+  //  **** Nutzlast fuer c_CID_UTL_Request_AD57_Reboot ( 0x207 ) ***************
+  //
+  //  Ein fest vereinbartes Byte, damit ein verfaelschtes oder falsch
+  //  adressiertes Paket kein AD57 im Flug neu startet.
+  //
+  #define c_UTL_Reboot_Magic    0xB7
   //
   //  **** Item-IDs fuer c_CID_SNN_Set_Config_Item ( 0x402 ) *******************
   //
