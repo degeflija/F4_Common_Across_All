@@ -116,7 +116,7 @@
 
   //  6.  BL on AD57, read from uSD, flash local application
   //
-  void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index );
+  uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index );   //  c_ok / c_nok
 
   //  7.  Appl on AD57, read from uSD, flash local BL
   //

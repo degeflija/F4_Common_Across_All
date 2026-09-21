@@ -709,7 +709,7 @@ void portable_memset ( uint8_t * dest, uint8_t value, uint32_t size )
 //
 int16_t  portable_memcmp ( uint8_t * dest, uint8_t * source, uint32_t size )
 {
-  int16_t  i       = 0;
+  int32_t  i       = 0;
   int16_t  result  = 0;
 
   while ( i < size )

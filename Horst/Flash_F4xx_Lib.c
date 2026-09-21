@@ -357,7 +357,12 @@ uint8_t AD57_CRC_Plus_EEProm_Health_Check ( void )
 //
 //  6. BL on AD57, read from uSD, flash local application
 //
-void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
+//
+//  21.09.2026 : Rueckgabe c_ok nur, wenn die Anwendung vollstaendig geflasht,
+//  verifiziert und CRC-geprueft ist. Nur dann darf task_Flash_Loop_Control
+//  in die Anwendung springen. Bei c_nok bleibt das Geraet im BootLoader.
+//
+uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
 {
   #if ( defined BUILD_AD57_BL )
   {
@@ -391,7 +396,7 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
                                 &Flash_LCtr_OutQItem,
                                 portMAX_DELAY );
       ASSERT ( l_q_result == 1 );
-      return;
+      return c_nok;
     }
 
     //
@@ -400,7 +405,27 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
     memcpy ( l_filename, g_DirListItems[dir_list_index], c_filename_size );
     l_filename[c_filename_size] = 0;
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
-    ASSERT ( l_sd_result == SD_OK );
+    //
+    //  21.09.2026 : Laesst sich die Datei nicht oeffnen, wird NICHT geflasht.
+    //  Hier stand nur eine ASSERT, und SD_Card_File_Open_4_Read() der alten
+    //  BL-Fassung gab ohnehin immer SD_OK zurueck. Der Ablauf loeschte dann in
+    //  Schritt 5 die Anwendung und schrieb den Inhalt einer nie geoeffneten
+    //  Datei hinein. Jetzt Abbruch, BEVOR ein Sektor angefasst wird - die alte
+    //  Anwendung bleibt heil.
+    //
+    if ( l_sd_result != SD_OK )
+    {
+      Flash_LCtr_OutQItem.Status  = c_flash_file_read_failure;
+      Flash_LCtr_OutQItem.ToDo    = 0;
+      Flash_LCtr_OutQItem.Done    = 0;
+      Flash_LCtr_OutQItem.Repeats = 0;
+      l_q_result = xQueueSend ( Flash_LCtr_OutQId,
+                                &Flash_LCtr_OutQItem,
+                                portMAX_DELAY );
+      ASSERT ( l_q_result == 1 );
+      vTaskDelay ( 10000 );     //  Meldung stehen lassen
+      return c_nok;
+    }
 
     //  Step 2 : Retrieve size of hex input file to be flashed
     //
@@ -426,7 +451,7 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
       //  im oberen Flash.
       //
       SD_Card_File_Close ( &hex_input_file );
-      return;
+      return c_nok;
     }
     //  Step 5 : Loop to erase sectors
     //
@@ -530,7 +555,14 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
                                     portMAX_DELAY );
           ASSERT ( l_q_result == 1 );
 
-          ASSERT ( l_result == 0 );
+          //
+          //  21.09.2026 : Abbruch statt Weitermachen. Hier stand nur eine
+          //  ASSERT, danach lief das Flashen weiter und am Ende sprang
+          //  task_Flash_Loop_Control in die fehlerhafte Anwendung.
+          //
+          (void) SD_Card_File_Close ( &hex_input_file );
+          vTaskDelay ( 10000 );   //  Meldung stehen lassen
+          return c_nok;
         }
 
         //
@@ -561,6 +593,26 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
       }
     }
 
+    //
+    //  21.09.2026 : Ein Lesefehler mitten in der Datei beendet die Schleife
+    //  oben wie ein Dateiende ( SD_Card_File_Read() liefert dann SD_EOF und
+    //  0 Bytes ). Erkennbar ist er daran, dass SD_Card_Mark_Dead() die Karte
+    //  abgemeldet hat. Dann ehrlich "uSD Read FAILED" statt CRC-Fehler.
+    //
+    if ( ! g_SDCard_Mounted )
+    {
+      Flash_LCtr_OutQItem.Status  = c_flash_file_read_failure;
+      Flash_LCtr_OutQItem.ToDo    = l_filesize;
+      Flash_LCtr_OutQItem.Done    = l_count_size;
+      Flash_LCtr_OutQItem.Repeats = 0;
+      l_q_result = xQueueSend ( Flash_LCtr_OutQId,
+                                &Flash_LCtr_OutQItem,
+                                portMAX_DELAY );
+      ASSERT ( l_q_result == 1 );
+      vTaskDelay ( 10000 );     //  Meldung stehen lassen
+      return c_nok;
+    }
+
     if (l_crc != 0 )
     {
       Flash_LCtr_OutQItem.Status = c_flash_CRC_failure;
@@ -569,15 +621,22 @@ void BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
                                 portMAX_DELAY );
       ASSERT ( l_q_result == 1 );
 
-      ASSERT ( l_crc == 0 );
+      //
+      //  21.09.2026 : Abbruch statt Weitermachen - siehe Verifikationsfehler.
+      //
+      (void) SD_Card_File_Close ( &hex_input_file );
+      vTaskDelay ( 10000 );       //  Meldung stehen lassen
+      return c_nok;
     }
 
     /* Step 8 : Finalize Programming */
     l_sd_result = SD_Card_File_Close ( &hex_input_file );
 
-
+    return c_ok;
   }
   #endif
+  (void) dir_list_index;
+  return c_nok;                   //  in anderen Builds nie aufgerufen
 }
 
 //
@@ -790,7 +849,24 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     memcpy ( l_filename, g_DirListItems[dir_list_index], c_filename_size );
     l_filename[c_filename_size] = 0;
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
-    ASSERT ( l_sd_result == SD_OK );
+    //
+    //  21.09.2026 : Laesst sich die Datei nicht oeffnen, wird abgebrochen -
+    //  und zwar VOR Step 3. Dort wird der Satellit per CAN in seinen
+    //  BootLoader geschickt; ohne Datei stuende er danach ohne Anwendung da.
+    //
+    if ( l_sd_result != SD_OK )
+    {
+      Flash_LCtr_OutQItem.Status  = c_flash_file_read_failure;
+      Flash_LCtr_OutQItem.ToDo    = 0;
+      Flash_LCtr_OutQItem.Done    = 0;
+      Flash_LCtr_OutQItem.Repeats = 0;
+      l_q_result = xQueueSend ( Flash_LCtr_OutQId,
+                                &Flash_LCtr_OutQItem,
+                                portMAX_DELAY );
+      ASSERT ( l_q_result == 1 );
+      vTaskDelay ( 10000 );     //  Meldung stehen lassen
+      return;
+    }
 
     //  Step 2 :  Retrieve size of hex input file to be transferred via CAN
     //            Calc no of 256-byte chunks to be transferred via CAN
@@ -850,7 +926,30 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
                                         buffer1.u8,
                                         c_buffer_size,
                                         &l_bytesread );
-      ASSERT ( ( l_sd_result == SD_OK ) || ( l_sd_result == SD_EOF ) );
+
+      //
+      //  21.09.2026 : 0 Bytes gelesen, aber noch keine Magic Number gefunden :
+      //  entweder Lesefehler ( SD_Card_File_Read() meldet ihn als SD_EOF mit
+      //  0 Bytes ) oder die Datei ist ohne Magic Number zu Ende. Bisher lief
+      //  die Schleife dann endlos weiter und schickte 0xFF-Bloecke an den
+      //  Satelliten. Jetzt Abbruch mit Meldung, wie bei c_flash_transfer_failure.
+      //
+      if ( ( l_bytesread == 0 ) ||
+           ( ( l_sd_result != SD_OK ) && ( l_sd_result != SD_EOF ) ) )
+      {
+        Flash_LCtr_OutQItem.Status  = c_flash_file_read_failure;
+        Flash_LCtr_OutQItem.ToDo    = l_filesize;
+        Flash_LCtr_OutQItem.Done    = l_count_size;
+        Flash_LCtr_OutQItem.Repeats = MDP_Get_Repeat_Count ( );
+        l_q_result = xQueueSend ( Flash_LCtr_OutQId,
+                                  &Flash_LCtr_OutQItem,
+                                  portMAX_DELAY );
+        ASSERT ( l_q_result == 1 );
+
+        (void) SD_Card_File_Close ( &hex_input_file );
+        vTaskDelay ( 10000 );     //  Meldung stehen lassen
+        return;
+      }
 
 
       //  Check if magic number resides in this block of flash data
