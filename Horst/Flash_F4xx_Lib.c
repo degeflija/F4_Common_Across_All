@@ -646,71 +646,150 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
 //
 //  7. Appl on AD57, read from uSD, flash local BL
 //
-void Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
+//
+//  21.09.2026 : Neu aufgebaut. Hier wird der BootLoader ueberschrieben -
+//  Sektor 0 mit dem Reset-Vektor eingeschlossen. Geht nach dem Loeschen etwas
+//  schief, startet das Geraet beim naechsten Einschalten nicht mehr und ist
+//  nur noch mit ST-Link zu retten.
+//
+//  Deshalb :
+//
+//    1.  Probelauf VOR dem Loeschen : die ganze Datei wird einmal gelesen,
+//        Groesse und CRC werden geprueft - genau so, wie es spaeter beim
+//        Flashen noch einmal geschieht. Fehlt die Datei, ist sie zu gross,
+//        kaputt oder die Karte liest nicht sauber, wird abgebrochen und der
+//        alte BootLoader bleibt unberuehrt.
+//
+//    2.  Rueckgabe c_ok / c_nok. Nur bei c_ok startet task_MMI den
+//        BootLoader neu. Bisher geschah das immer, auch nach einem Fehler -
+//        also Sprung in einen halb geloeschten BootLoader.
+//
+//    3.  g_ProgramStatus.IsInError sagt der Seite c_Wait4Flash, was passiert
+//        ist :
+//          c_BL_Flash_Not_Done       BootLoader nicht angefasst, alles heil
+//          c_BL_Flash_BL_Destroyed   BootLoader geloescht und nicht fertig
+//                                    geschrieben - NICHT ausschalten,
+//                                    Update wiederholen
+//
+//    s_BL_Destroyed merkt sich Letzteres bis zu einem erfolgreichen Flash.
+//    Scheitert der naechste Versuch schon vor dem Loeschen ( z.B. weil die
+//    Karte inzwischen abgemeldet ist ), darf die Meldung trotzdem nicht
+//    "alles heil" lauten.
+//
+uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
 {
   #if ( defined BUILD_AD57_FE )
   {
-
     uint16_t    l_sd_result;
     uint16_t    l_result = 0;
     uint8_t     l_filename[256];
     static FIL  hex_input_file;
+    static uint8_t  s_BL_Destroyed = false;
     uint32_t    l_bytesread = 0;
     buffer_t    buffer1;
     buffer_t    l_buffer;
     uint8_t     l_feof;
     uint32_t    l_count_size = 0;
     uint16_t    l_crc = 0;
+    uint32_t    l_flashable_space;
+
+    g_ProgramStatus.IsInError = 0;
 
     //  Step 1 : Open the hex input file to be flashed
     //
     strcpy ( (char*)l_filename, (char*)txt_BLhex );
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
-    //
-    //  Laesst sich die Datei nicht oeffnen, wird NICHT geflasht.
-    //
-    //  Hier stand nur eine ASSERT. Die konnte gar nicht ansprechen, weil
-    //  SD_Card_File_Open_4_Read() in der FE-Fassung bis vor kurzem
-    //  unbedingt SD_OK zurueckgab - der Ablauf lief also weiter, loeschte in
-    //  Schritt 5 die Sektoren des BootLoaders und schrieb anschliessend den
-    //  Inhalt einer nie geoeffneten Datei hinein. Eine fehlende BL.hex oder
-    //  eine kranke Karte haetten damit den BootLoader zerstoert.
-    //
-    //  Seit SD_Card_File_Open_4_Read() das echte Ergebnis liefert, wird hier
-    //  abgebrochen - bevor irgendein Sektor angefasst wird.
-    //
     if ( l_sd_result != SD_OK )
     {
-      g_ProgramStatus.IsInError = 1;
-      return;
+      g_ProgramStatus.IsInError = s_BL_Destroyed ? c_BL_Flash_BL_Destroyed
+                                                 : c_BL_Flash_Not_Done;
+      return c_nok;
     }
 
-    //  Step 2 : Retrieve size of hex input file to be flashed
+    //  Step 2 : Set flasher module internal addresses, get flashable space
     //
-    //uint32_t  l_filesize = SD_Card_File_Size ( &hex_input_file );
+    l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_min_lower_addr_space_sector );
 
-    //  Step 3 : Set flasher module internal addresses
+    //  Step 3 : Probelauf - ganze Datei lesen, Groesse und CRC pruefen.
+    //           Dieselbe CRC-Rechnung wie in Step 6, nur auf den Dateidaten
+    //           statt auf dem zurueckgelesenen Flash.
     //
-    //uint32_t  l_flashable_space =
-        Flash_F4xx_SetSectorAddrs ( c_min_lower_addr_space_sector );
+    l_feof        = 0;
+    l_count_size  = 0;
+    l_crc         = 0;
+    while ( l_feof == 0 )
+    {
+      l_sd_result = SD_Card_File_Read ( &hex_input_file,
+                                        buffer1.u8,
+                                        c_buffer_size,
+                                        &l_bytesread );
+      if ( l_bytesread == 0 )
+        l_feof = 1;
+      else
+      {
+        l_count_size += l_bytesread;
+        if ( l_count_size > l_flashable_space )
+          break;                                //  Datei zu gross
 
-    //  Step 4 : Check if hex file fits into flashable space
+        if ( l_bytesread != sizeof ( AppSignature_t ) )
+        {
+          l_crc = CRC16_blockcheck_bytes ( (uint8_t*) buffer1.u8,
+                                           l_crc,
+                                           l_bytesread );
+        }
+        else
+        {
+          l_crc = CRC16_blockcheck_bytes ( (uint8_t*) buffer1.u8,
+                                           l_crc,
+                                           l_bytesread-4 );
+          l_crc = l_crc - buffer1.u32[3];
+        }
+      }
+    }
+
+    if  (
+            ( ! g_SDCard_Mounted )                  //  Lesefehler, Karte abgemeldet
+          ||
+            ( l_count_size == 0 )                   //  leere Datei
+          ||
+            ( l_count_size > l_flashable_space )    //  zu gross
+          ||
+            ( l_crc != 0 )                          //  Inhalt kaputt
+        )
+    {
+      (void) SD_Card_File_Close ( &hex_input_file );
+      g_ProgramStatus.IsInError = s_BL_Destroyed ? c_BL_Flash_BL_Destroyed
+                                                 : c_BL_Flash_Not_Done;
+      return c_nok;
+    }
+
+    //  Step 4 : Datei fuer den eigentlichen Durchgang wieder an den Anfang
     //
-    //  if ( l_filesize > l_flashable_space )
-    //  {
-    //  }
+    l_sd_result = SD_Card_File_ReOpen_4_Read ( &hex_input_file, (uint8_t*) l_filename );
+    if ( l_sd_result != SD_OK )
+    {
+      g_ProgramStatus.IsInError = s_BL_Destroyed ? c_BL_Flash_BL_Destroyed
+                                                 : c_BL_Flash_Not_Done;
+      return c_nok;
+    }
+
     //  Step 5 : Loop to erase sectors
     //
+    //  AB HIER ist der alte BootLoader weg.
+    //
+    s_BL_Destroyed = true;
+    Flash_F4xx_SetSectorAddrs ( c_min_lower_addr_space_sector );
     for (uint8_t i = c_min_lower_addr_space_sector; i <= c_max_lower_addr_space_sector; i++ )
     {
       Flash_F4xx_EraseSector( i );
-
       vTaskDelay( 1 );
     }
 
-    //  Loop to read data to be flashed
+    //  Step 6 : Read, flash, verify, CRC
     //
-    l_feof  = 0;
+    l_feof        = 0;
+    l_count_size  = 0;
+    l_crc         = 0;
 
     while ( l_feof == 0 )
     {
@@ -721,7 +800,6 @@ void Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
                                         buffer1.u8,
                                         c_buffer_size,
                                         &l_bytesread );
-      ASSERT ( ( l_sd_result == SD_OK ) || ( l_sd_result == SD_EOF ) );
       if ( l_bytesread == 0 )
           l_feof = 1;
       else
@@ -748,9 +826,11 @@ void Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
         if ( l_result != 0 )
         {
           //
-          //  verification failure
+          //  verification failure - Abbruch statt Weitermachen
           //
-          ASSERT ( l_result == 0 );
+          (void) SD_Card_File_Close ( &hex_input_file );
+          g_ProgramStatus.IsInError = c_BL_Flash_BL_Destroyed;
+          return c_nok;
         }
 
         //
@@ -779,16 +859,24 @@ void Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
       }
     }
 
-    if (l_crc != 0 )
+    /* Step 7 : Finalize Programming */
+    (void) SD_Card_File_Close ( &hex_input_file );
+
+    //
+    //  Lesefehler im zweiten Durchgang ( Karte abgemeldet ) oder CRC falsch :
+    //  der BootLoader ist geloescht und nicht vollstaendig geschrieben.
+    //
+    if ( ( ! g_SDCard_Mounted ) || ( l_crc != 0 ) )
     {
-      ASSERT ( l_crc == 0 );
+      g_ProgramStatus.IsInError = c_BL_Flash_BL_Destroyed;
+      return c_nok;
     }
 
-    /* Step 8 : Finalize Programming */
-    l_sd_result = SD_Card_File_Close ( &hex_input_file );
+    s_BL_Destroyed = false;
+    return c_ok;
   }
   #endif
-
+  return c_nok;                   //  in anderen Builds nie aufgerufen
 }
 
 // *****************************************************************************
@@ -1034,9 +1122,9 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
 //
 //  9.  BL on AD57, read from uSD, Push to CAN, flash remote BL
 //
+#if 0
 void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_BL ( uint16_t  dir_list_index )
 {
-  #if ( defined BUILD_AD57_BL )
   {
     uint16_t    l_sd_result, l_q_result;
     uint32_t    l_bytesread = 0;
@@ -1097,9 +1185,8 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_BL ( uint16_t  dir_list_index )
       }
     }
   }
-  #endif
 }
-
+#endif
 //
 // *****************************************************************************
 // *****************************************************************************

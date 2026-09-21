@@ -120,7 +120,14 @@
 
   //  7.  Appl on AD57, read from uSD, flash local BL
   //
-  void Appl_on_AD57_Read_SD_Flash_Local_BL ( void );
+  uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void );   //  c_ok / c_nok
+
+  //
+  //  21.09.2026 : Werte in g_ProgramStatus.IsInError nach
+  //  Appl_on_AD57_Read_SD_Flash_Local_BL() == c_nok, fuer die Seite c_Wait4Flash
+  //
+  #define   c_BL_Flash_Not_Done           1   //  BootLoader unveraendert
+  #define   c_BL_Flash_BL_Destroyed       2   //  BootLoader geloescht, nicht fertig
 
   //  8.  BL on AD57, read from uSD, push to CAN, flash remote application
   //
