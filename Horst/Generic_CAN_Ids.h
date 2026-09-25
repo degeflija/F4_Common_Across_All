@@ -161,7 +161,7 @@
     c_CID_AD57_Euler_SetUp      = 0x309,    //!< int16_t as float dec deg * 10 +  // Roll
                                             //!< int16_t as float dec deg * 10 +  // Pitch
                                             //!< int16_t as float dec deg * 10    // Yaw
-    c_CID_AD57_DecInclination   = 0x30a,    //!< int16_t as float dec deg * 10 +  // Declination
+    c_CID_AD57_DeCinGlination   = 0x30a,    //!< int16_t as float dec deg * 10 +  // Declination
                                             //!< int16_t as float dec deg * 10    // Inclination
     c_CID_AD57_IAS_Offset       = 0x30b,    //!< int16_t as float km/h * 10
 
