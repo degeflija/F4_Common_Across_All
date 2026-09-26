@@ -1964,6 +1964,18 @@ void Generic_Signature_SelfSign ( void )
     //  FLASH ORIGIN = 0x08080000; only the unused *_not_relocated.ld
     //  starts at 0x08000000).
     //
+    //  26.09.2026 : Schutz gegen einen NICHT relocated gebauten Stand
+    //  ( Image ab 0x08000000 ). Dann liegt die Signatur unterhalb von
+    //  APP_ADDRESS, die Subtraktion unten wuerde negativ ( als uint32_t
+    //  rund 4 GB ), und die CRC-Schleife liest ueber das Flash-Ende hinaus
+    //  --> BusFault in Flash_F4xx_Read. So startet ein nicht relocated
+    //  gebautes P_Util unter dem Debugger normal, nur eben unsigniert.
+    //
+    if ( ( (uint32_t) &ThisApplicationsSignature[0] ) < APP_ADDRESS )
+    {
+      return;    // nicht relocated gebaut -- nichts zu signieren
+    }
+
     l_bytes_total = ( (uint32_t) &ThisApplicationsSignature[0] ) - APP_ADDRESS;
 
     //
