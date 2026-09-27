@@ -175,11 +175,9 @@
                                             //!< uint8_t  duty cycle
                                             //!< uint8_t  climb-mode
 
-    c_CID_AD57_Flaps_Status     = 0x312,    //!< uint8_t  0/1 on/off-switch
-                                            //!< uint8_t  CurrentFlapsSetting
-                                            //!< uint8_t  OptimalFlapsSetting
-                                            //!< uint8_t  FlapsFlashControl
-                                            //!< uint8_t  LEDDutyCycle in %
+    //  27.09.2026 : 0x312 c_CID_AD57_Flaps_Status ( FE -> Audio, LED-Leiste
+    //  der Woelbklappen ) gestrichen - die LED-Leiste entfaellt.
+    //  0x312 nicht wiederverwenden, solange noch alte Audio-SW fliegt.
     c_CID_AD57_HeartBeatSlave   = 0x313,    //!< uint32_t  version as 0x0102002a "1.02 Build 42"
 
     //
@@ -189,6 +187,16 @@
     c_CID_AD57_LOST_CONTROL     = 0x322,    //!< !!!!!!!!!!!!!!!!!!!
     c_CID_AD57_SYNC_PARAMETER   = 0x323,    //!< sync parameters on slave
     c_CID_AD57_SYNC_FlightMode  = 0x324,    //!< sync parameters on slave
+    c_CID_AD57_SWITCH_STATE     = 0x325,    //!< 26.09.2026 : Mikroschalter FW/BK an das zweite FE
+                                            //!< uint8_t  c_Switch_State_Magic
+                                            //!< uint8_t  Gear_Locked ( am Schaltpunkt )
+                                            //!< uint8_t  Brakes_Locked ( eingefahren )
+                                            //!< uint8_t  Gear_Switch_Position ( 0 / 1 )
+    c_CID_AD57_PLANE_TYPE       = 0x326,    //!< 27.09.2026 : Flugzeugtyp ( .fzt-Name ) an das zweite FE
+                                            //!< 4 Pakete, DLC 8 :
+                                            //!< uint8_t  Paket-Nummer 0 .. 3
+                                            //!< uint8_t  7 Zeichen des Namens ( Paket n : Zeichen 7n .. 7n+6 )
+                                            //!< 4 x 7 = 28 = c_filename_size, 0-terminiert
 
 
     /*
