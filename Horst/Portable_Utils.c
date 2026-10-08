@@ -454,7 +454,11 @@ char * portable_compress ( char *input )
       {
         input[j] = input[j+1];
       }
-      input[j+1] = 0;
+      //  08.10.2026 : Die Schleife kopiert die abschliessende 0 bereits mit
+      //  ( input[k-1] = input[k] ). Hier stand "input[j+1] = 0" - das schrieb
+      //  eine 0 auf input[k+1], also HINTER das Ende der Zeichenkette : in
+      //  den naechsten Text im selben Puffer ( "Name = Wert" -> Wert leer )
+      //  oder ueber das Ende des Puffers hinaus.
       i--;
     }
     i++;
@@ -1355,7 +1359,7 @@ int16_t portable_atoi ( const char* ValText )
 // ****************************************************************************
 {
   uint32_t  i         = 0;
-  uint8_t   sign      = 1;    // plus assumed
+  int8_t    sign      = 1;    // plus assumed    08.10.2026 : war uint8_t - aus "-3" wurde 765
   int16_t   result    = 0;
   //
   //  normal processing
@@ -1402,7 +1406,7 @@ int32_t portable_atol ( const char* ValText )
 // ****************************************************************************
 {
   uint32_t  i         = 0;
-  uint8_t   sign      = 1;    // plus assumed
+  int8_t    sign      = 1;    // plus assumed    08.10.2026 : war uint8_t - aus "-3" wurde 765
   int32_t   result    = 0;
   //
   //  normal processing
