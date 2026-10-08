@@ -197,6 +197,11 @@
                                             //!< uint8_t  Paket-Nummer 0 .. 3
                                             //!< uint8_t  7 Zeichen des Namens ( Paket n : Zeichen 7n .. 7n+6 )
                                             //!< 4 x 7 = 28 = c_filename_size, 0-terminiert
+    c_CID_AD57_PLANE_REG        = 0x327,    //!< 08.10.2026 : Kennzeichen des Flugzeugs an das zweite FE
+                                            //!< 2 Pakete, DLC 8 :
+                                            //!< uint8_t  Paket-Nummer 0 .. 1
+                                            //!< uint8_t  7 Zeichen ( Paket n : Zeichen 7n .. 7n+6 )
+                                            //!< 2 x 7 = 14 = c_Plane_Reg_Size, 0-terminiert
 
 
     /*
