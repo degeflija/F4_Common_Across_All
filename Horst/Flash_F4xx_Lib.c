@@ -966,7 +966,7 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     //
     Start_MDP_on_Remote_Board_via_CAN  ( p_id );
 
-    //  The 0x330 trigger makes the remote satellite board (P_Util) self-jump
+    //  The 0x330 trigger makes the remote satellite board (Audio) self-jump
     //  to GenBL's cold start, and GenBL in turn self-jumps too (task_CAN_Bus_Receiver.c,
     //  BUILD_F4_GenBL branch) -- a real reboot (CAN deinit/reinit, NVIC clear,
     //  FreeRTOS restart), not an instant handoff. <established> is still true here
@@ -990,8 +990,8 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     //  NOTE: this whole function only ever compiles under BUILD_AD57_BL (see
     //  the outer #if above) and is only ever called with p_id ==
     //  c_CID_AD57_Requests_Audio_Reboot, i.e. the target is always the
-    //  GenBL/P_Util satellite board -- so the longer settle delay below is
-    //  unconditionally the correct one (a #if(BUILD_F4_GenBL||BUILD_F4_P_UTIL)
+    //  GenBL/Audio satellite board -- so the longer settle delay below is
+    //  unconditionally the correct one (a #if(BUILD_F4_GenBL||BUILD_F4_AUDIO)
     //  branch here can never be taken, since that macro is never defined in
     //  a BUILD_AD57_BL build; it used to silently fall through to a bare
     //  10 ms delay instead).
@@ -1051,9 +1051,9 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
       if ( ! g_CAN_Bus_Util_Data_Xfer_established )
       {
         //  See NOTE above Step 3: this function only ever runs on BL targeting
-        //  the GenBL/P_Util satellite reboot, so the extra 1000 ms settle margin
+        //  the GenBL/Audio satellite reboot, so the extra 1000 ms settle margin
         //  after re-establishing is unconditionally correct here (the
-        //  BUILD_F4_GenBL/BUILD_F4_P_UTIL branch this used to be guarded behind
+        //  BUILD_F4_GenBL/BUILD_F4_AUDIO branch this used to be guarded behind
         //  could never be taken in a BUILD_AD57_BL build).
         //
         while ( ! g_CAN_Bus_Util_Data_Xfer_established )
@@ -1389,7 +1389,7 @@ void BL_on_F4_Read_CAN_Flash_Local_Appl ( void )
 //
 //void Appl_on_F4_Read_CAN_Flash_Local_BL ( void )
 //{
-//  #if ( defined BUILD_F4_P_UTIL_ )    // TODO
+//  #if ( defined BUILD_F4_AUDIO_ )    // TODO
 //  {
 //    uint16_t    l_sd_result;
 //    uint16_t    l_result = 0;
@@ -1690,7 +1690,7 @@ void Bootloader_JumpToColdStart(void)
    *  registers back to their power-on-reset values. This is very
    *  likely THE reason "jump back to ColdStart" recovers Audio's CAN
    *  link less reliably than an actual power-cycle does - GenBL's own
-   *  CAN_Init() then runs against whatever state P_Util's CAN1 usage
+   *  CAN_Init() then runs against whatever state Audio's CAN1 usage
    *  left behind (filters, error counters, bus-off/sleep flags) rather
    *  than a clean peripheral.
    */
@@ -1819,7 +1819,7 @@ void Bootloader_JumpToColdStart(void)
 ////
 //void F4_Write_Signature_Sector_7 ( AppSignature_t * Signature )
 //{
-//  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_P_UTIL )
+//  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_AUDIO )
 //  {
 //    //
 //    //  Set sector addresses for
@@ -1928,7 +1928,7 @@ extern uint32_t ThisApplicationsSignature[4];
 
 void Generic_Signature_SelfSign ( void )
 {
-  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_P_UTIL )
+  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_AUDIO )
   {
     buffer_t    l_buffer;     // re-used to read the app image, 256 bytes at a time
     buffer_t    l_sigbuf;     // holds the 12-byte header + recomputed CRC
@@ -1969,7 +1969,7 @@ void Generic_Signature_SelfSign ( void )
     //  APP_ADDRESS, die Subtraktion unten wuerde negativ ( als uint32_t
     //  rund 4 GB ), und die CRC-Schleife liest ueber das Flash-Ende hinaus
     //  --> BusFault in Flash_F4xx_Read. So startet ein nicht relocated
-    //  gebautes P_Util unter dem Debugger normal, nur eben unsigniert.
+    //  gebautes Audio unter dem Debugger normal, nur eben unsigniert.
     //
     if ( ( (uint32_t) &ThisApplicationsSignature[0] ) < APP_ADDRESS )
     {
@@ -2034,7 +2034,7 @@ void Generic_Signature_SelfSign ( void )
 //
 //void F4_Clear_Signature_Sector_7 ( void )
 //{
-//  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_P_UTIL )
+//  #if ( defined BUILD_F4_GenBL ) || ( defined BUILD_F4_AUDIO )
 //  {
 //    //
 //    //  Set sector addresses for wipe clear function

@@ -6,7 +6,7 @@
   * @brief    Header for library containing all portable basic functions.
   *
   *           Kept identical across AD57_FE_GIT, AD57_BL_GIT, F4_GenBL_GIT
-  *           and F4_P_Util_GIT (Common-tier candidate). Only depends on
+  *           and F4_Audio_GIT (Common-tier candidate). Only depends on
   *           General_Includes.h / math.h, which exist in all four projects.
   *
   *           Functions that need FE/BL-only application context (canvas
