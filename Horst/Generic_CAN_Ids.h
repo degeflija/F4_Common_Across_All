@@ -178,28 +178,47 @@
     c_CID_AD57_HeartBeatSlave   = 0x313,    //!< uint32_t  version as 0x0102002a "1.02 Build 42"
 
     //
-    //  Master/Slave synchronisation
+    //  Abgleich der beiden AD57 im Doppelsitzer ( 13.10.2026, neues Konzept,
+    //  Master_Slave_Lib.c ). Ersetzt Master/Slave, MakeMeMaster und
+    //  Sync-Mode.
     //
-    c_CID_AD57_GRAB_CONTROL     = 0x322,    //!< !!!!!!!!!!!!!!!!!!!
-    c_CID_AD57_LOST_CONTROL     = 0x322,    //!< !!!!!!!!!!!!!!!!!!!
-    c_CID_AD57_SYNC_PARAMETER   = 0x323,    //!< sync parameters on slave
-    c_CID_AD57_SYNC_FlightMode  = 0x324,    //!< sync parameters on slave
-    c_CID_AD57_SWITCH_STATE     = 0x325,    //!< 26.09.2026 : Mikroschalter FW/BK an das zweite FE
+    //  0x322, 0x323, 0x324, 0x326, 0x327 sind FREI, aber NICHT wieder
+    //  verwenden, solange AD57 mit SW vor 7.23 Build 10 fliegen : deren
+    //  Empfaenger deuten diese Kennungen noch als GRAB/LOST_CONTROL,
+    //  SYNC_PARAMETER, Flugzeugtyp und Kennzeichen. Darum liegen die neuen
+    //  Kennungen auf 0x328 .. 0x32D, die die alte SW ueberliest.
+    //
+    c_CID_AD57_SWITCH_STATE     = 0x325,    //!< 26.09.2026 : Mikroschalter FW/BK und Klappen-Raste an das andere AD57
                                             //!< uint8_t  c_Switch_State_Magic
                                             //!< uint8_t  Gear_Locked ( am Schaltpunkt )
                                             //!< uint8_t  Brakes_Locked ( eingefahren )
                                             //!< uint8_t  Gear_Switch_Position ( 0 / 1 )
-    c_CID_AD57_PLANE_TYPE       = 0x326,    //!< 27.09.2026 : Flugzeugtyp ( .fzt-Name ) an das zweite FE
-                                            //!< 4 Pakete, DLC 8 :
-                                            //!< uint8_t  Paket-Nummer 0 .. 3
-                                            //!< uint8_t  7 Zeichen des Namens ( Paket n : Zeichen 7n .. 7n+6 )
-                                            //!< 4 x 7 = 28 = c_filename_size, 0-terminiert
-    c_CID_AD57_PLANE_REG        = 0x327,    //!< 08.10.2026 : Kennzeichen des Flugzeugs an das zweite FE
-                                            //!< 2 Pakete, DLC 8 :
-                                            //!< uint8_t  Paket-Nummer 0 .. 1
-                                            //!< uint8_t  7 Zeichen ( Paket n : Zeichen 7n .. 7n+6 )
-                                            //!< 2 x 7 = 14 = c_Plane_Reg_Size, 0-terminiert
-
+                                            //!< uint8_t  gueltig : Bit 0 Schalter, Bit 1 Klappen
+                                            //!< uint8_t  Klappen-Raste
+                                            //!< uint8_t  13.10.2026 : Sitz des Senders 1 vorn / 2 hinten ( DLC 7 )
+    c_CID_AD57_SYNC_INFO        = 0x328,    //!< 13.10.2026 : Kopf des Abgleichs, mit jedem HeartBeat, DLC 8
+                                            //!< uint8_t  c_Sync_Version
+                                            //!< uint8_t  Sitz 0 vorn / 1 hinten
+                                            //!< uint8_t  Bit 0 : fuehrt den Ton
+                                            //!< uint8_t  Ton-Anspruch ( Zaehler )
+                                            //!< uint8_t  Flight_Phase
+                                            //!< uint8_t  0
+                                            //!< uint16_t 0
+    c_CID_AD57_SYNC_STATE_1     = 0x329,    //!< 13.10.2026 : uint16_t Gen F, CRC F, Gen B, CRC B
+    c_CID_AD57_SYNC_STATE_2     = 0x32A,    //!< 13.10.2026 : uint16_t Gen S, CRC S, Gen T, CRC T
+    c_CID_AD57_SYNC_HEAD        = 0x32B,    //!< 13.10.2026 : Kopf einer Gruppe, DLC 8
+                                            //!< uint8_t  Gruppe 0 F / 1 B / 2 S / 3 T / 4 P
+                                            //!< uint8_t  Anzahl Werte
+                                            //!< uint16_t Gen
+                                            //!< uint16_t CRC
+                                            //!< uint8_t  Bit 0 : bei gleicher Gen uebernehmen
+                                            //!< uint8_t  Sitz des Senders
+    c_CID_AD57_SYNC_VALUE       = 0x32C,    //!< 13.10.2026 : ein Wert, DLC 8
+                                            //!< uint8_t  Gruppe
+                                            //!< uint8_t  laufende Nummer 0 .. Anzahl-1
+                                            //!< uint16_t Schluessel
+                                            //!< uint32_t Wert ( int32_t oder float-Bits )
+    c_CID_AD57_PILOT_SET        = 0x32D,    //!< 13.10.2026 : uint8_t 1 Angebot / 2 Anforderung / 3 abgelehnt
 
     /*
     c_CID_AD57_MC_CREADY        = 0x320,
