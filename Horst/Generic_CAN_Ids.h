@@ -195,30 +195,37 @@
                                             //!< uint8_t  Gear_Switch_Position ( 0 / 1 )
                                             //!< uint8_t  gueltig : Bit 0 Schalter, Bit 1 Klappen
                                             //!< uint8_t  Klappen-Raste
-                                            //!< uint8_t  13.10.2026 : Sitz des Senders 1 vorn / 2 hinten ( DLC 7 )
-    c_CID_AD57_SYNC_INFO        = 0x328,    //!< 13.10.2026 : Kopf des Abgleichs, mit jedem HeartBeat, DLC 8
+                                            //!< 13.10.2026 abends : DLC wieder 6 ( Byte 6 Sitz entfallen ).
+                                            //!< Bit 0 / Bit 1 sagen, dass am Sender Schalter / Poti haengen.
+    //
+    //  13.10.2026 abends : einfacher Abgleich ( c_Sync_Version 2,
+    //  Master_Slave_Lib.c ). 0x32E ( SEAT_SET vom Mittag ) ist frei, aber
+    //  nicht wieder verwenden, solange AD57 mit dem Build vom Mittag fliegen.
+    //
+    c_CID_AD57_SYNC_INFO        = 0x328,    //!< Kopf des Abgleichs, mit jedem HeartBeat, DLC 8
                                             //!< uint8_t  c_Sync_Version
-                                            //!< uint8_t  Sitz 0 vorn / 1 hinten
-                                            //!< uint8_t  Bit 0 : fuehrt den Ton
+                                            //!< uint8_t  Bit 0 : fuehrt den Ton, Bit 1 : bereit ( Hochlauf fertig )
                                             //!< uint8_t  Ton-Anspruch ( Zaehler )
                                             //!< uint8_t  Flight_Phase
+                                            //!< uint32_t Laufzeit seit dem Start in s
+    c_CID_AD57_SYNC_ONE         = 0x329,    //!< ein gemeinsamer Wert, DLC 8
+                                            //!< uint16_t Schluessel
+                                            //!< uint8_t  Bit 0 : Teil von "alle Werte einmal"
+
                                             //!< uint8_t  0
-                                            //!< uint16_t 0
-    c_CID_AD57_SYNC_STATE_1     = 0x329,    //!< 13.10.2026 : uint16_t Gen F, CRC F, Gen B, CRC B
-    c_CID_AD57_SYNC_STATE_2     = 0x32A,    //!< 13.10.2026 : uint16_t Gen S, CRC S, Gen T, CRC T
-    c_CID_AD57_SYNC_HEAD        = 0x32B,    //!< 13.10.2026 : Kopf einer Gruppe, DLC 8
-                                            //!< uint8_t  Gruppe 0 F / 1 B / 2 S / 3 T / 4 P
+                                            //!< uint32_t Wert ( int32_t oder float-Bits )
+    c_CID_AD57_SYNC_ACK         = 0x32A,    //!< Quittung fuer SYNC_ONE, DLC 2
+                                            //!< uint16_t Schluessel
+    c_CID_AD57_SYNC_HEAD        = 0x32B,    //!< Kopf des Piloten-Satzes, DLC 8
+                                            //!< uint8_t  4 ( c_Sync_Grp_P )
                                             //!< uint8_t  Anzahl Werte
-                                            //!< uint16_t Gen
-                                            //!< uint16_t CRC
-                                            //!< uint8_t  Bit 0 : bei gleicher Gen uebernehmen
-                                            //!< uint8_t  Sitz des Senders
-    c_CID_AD57_SYNC_VALUE       = 0x32C,    //!< 13.10.2026 : ein Wert, DLC 8
-                                            //!< uint8_t  Gruppe
+    c_CID_AD57_SYNC_VALUE       = 0x32C,    //!< ein Wert des Piloten-Satzes, DLC 8
+                                            //!< uint8_t  4 ( c_Sync_Grp_P )
                                             //!< uint8_t  laufende Nummer 0 .. Anzahl-1
                                             //!< uint16_t Schluessel
                                             //!< uint32_t Wert ( int32_t oder float-Bits )
-    c_CID_AD57_PILOT_SET        = 0x32D,    //!< 13.10.2026 : uint8_t 1 Angebot / 2 Anforderung / 3 abgelehnt
+    c_CID_AD57_PILOT_SET        = 0x32D,    //!< uint8_t 1 Angebot / 2 Anforderung / 3 abgelehnt
+
 
     /*
     c_CID_AD57_MC_CREADY        = 0x320,
