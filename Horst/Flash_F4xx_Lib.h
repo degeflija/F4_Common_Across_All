@@ -123,11 +123,11 @@
   uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void );   //  c_ok / c_nok
 
   //
-  //  21.09.2026 : Werte in g_ProgramStatus.IsInError nach
-  //  Appl_on_AD57_Read_SD_Flash_Local_BL() == c_nok, fuer die Seite c_Wait4Flash
+  //  21.09.2026 : Values in g_ProgramStatus.IsInError after
+  //  Appl_on_AD57_Read_SD_Flash_Local_BL() == c_nok, for the page c_Wait4Flash
   //
-  #define   c_BL_Flash_Not_Done           1   //  BootLoader unveraendert
-  #define   c_BL_Flash_BL_Destroyed       2   //  BootLoader geloescht, nicht fertig
+  #define   c_BL_Flash_Not_Done           1   //  BootLoader unchanged
+  #define   c_BL_Flash_BL_Destroyed       2   //  BootLoader erased, not finished
 
   //  8.  BL on AD57, read from uSD, push to CAN, flash remote application
   //
@@ -161,9 +161,9 @@
   //
   //  16. Check Signature
   //
-  //  Definition auskommentiert - Sektor 7 ist fuer den Boot-Entscheid
-  //  ohne Bedeutung. Deklaration mit stillgelegt, damit niemand die
-  //  Funktion versehentlich wieder aufruft.
+  //  Definition commented out - sector 7 plays no role in the boot
+  //  decision. The declaration is disabled as well, so that nobody
+  //  calls the function again by mistake.
   //
   //uint16_t F4_Check_Signature_Sector_7 ( void );
 

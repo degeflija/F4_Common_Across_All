@@ -454,11 +454,11 @@ char * portable_compress ( char *input )
       {
         input[j] = input[j+1];
       }
-      //  08.10.2026 : Die Schleife kopiert die abschliessende 0 bereits mit
-      //  ( input[k-1] = input[k] ). Hier stand "input[j+1] = 0" - das schrieb
-      //  eine 0 auf input[k+1], also HINTER das Ende der Zeichenkette : in
-      //  den naechsten Text im selben Puffer ( "Name = Wert" -> Wert leer )
-      //  oder ueber das Ende des Puffers hinaus.
+      //  08.10.2026 : The loop already copies the terminating 0
+      //  ( input[k-1] = input[k] ). Here was "input[j+1] = 0" - that wrote
+      //  a 0 to input[k+1], so BEHIND the end of the string : into the
+      //  next text in the same buffer ( "Name = Wert" -> value empty )
+      //  or past the end of the buffer.
       i--;
     }
     i++;
@@ -771,30 +771,30 @@ void portable_uint32_2_hex_str ( uint32_t n, char* res )
 /* ****************************************************************************
  *  portable_ftoa()
  *
- *  Wandelt <n> in einen String <res> mit <no_of_decimals> Nachkommastellen.
- *  <res_len> ist die Nutzlaenge; der Puffer muss res_len+1 Bytes gross sein
- *  ( wie bisher - das memset() unten schreibt res[res_len] = 0 ).
+ *  Converts <n> into a string <res> with <no_of_decimals> decimal places.
+ *  <res_len> is the usable length; the buffer must be res_len+1 bytes
+ *  ( as before - the memset() below writes res[res_len] = 0 ).
  *
- *  Ausgabeformat unveraendert gegenueber der alten Version:
- *    linksbuendig, kein Vorzeichen bei positiven Werten,
- *    kein Dezimalpunkt wenn no_of_decimals == 0.
+ *  Output format unchanged from the old version:
+ *    left aligned, no sign for positive values,
+ *    no decimal point if no_of_decimals == 0.
  *
- *  Geaendert gegenueber der alten Version:
- *    - schreibt NIE ueber res[res_len] hinaus ( vorher konnte das strcat()
- *      am Ende bei zu kleinem res_len mehrere Bytes ueberlaufen )
- *    - kein strcat(), kein PreFix_Char(), kein portable_itoa() mehr noetig
- *    - NaN / Inf / Ueberlauf liefern '*'-Fuellung statt undefiniertem Wert
+ *  Changed from the old version:
+ *    - NEVER writes past res[res_len] ( before, the strcat() at the
+ *      end could overflow by several bytes if res_len was too small )
+ *    - no strcat(), no PreFix_Char(), no portable_itoa() needed any more
+ *    - NaN / Inf / overflow give a '*' fill instead of an undefined value
  *
- *  ACHTUNG - Entscheidung: passt die Zahl nicht in res_len Zeichen, wird
- *  komplett mit '*' gefuellt. Das ist Absicht: ein abgeschnittenes "123456"
- *  statt "123456.78" waere auf der Anzeige nicht als Fehler erkennbar.
- *  Wer lieber abschneiden will, aendert nur portable_ftoa_Overflow().
+ *  CAUTION - decision: if the number does not fit into res_len characters,
+ *  the buffer is filled completely with '*'. This is on purpose: a cut
+ *  "123456" instead of "123456.78" would not show as an error on the
+ *  display. Who prefers cutting only changes portable_ftoa_Overflow().
  * ***************************************************************************/
 
-#define FTOA_MAX_DECIMALS   9u          /* 10^9 passt noch in uint32_t */
+#define FTOA_MAX_DECIMALS   9u          /* 10^9 still fits into uint32_t */
 
 /* ---------------------------------------------------------------------------
- *  Puffer komplett mit '*' fuellen ( Zahl passt nicht / ist keine Zahl )
+ *  Fill the buffer completely with '*' ( number does not fit / is no number )
  * -------------------------------------------------------------------------*/
 static void portable_ftoa_Overflow ( char * res, unsigned res_len )
 {
@@ -840,7 +840,7 @@ void portable_ftoa ( double n, char * res, unsigned no_of_decimals, unsigned res
   unsigned  d;
   uint8_t   is_negative = 0;
 
-  // -------------------  Vorbedingungen
+  // -------------------  Preconditions
 
   if ( res == 0 )
     return;
@@ -856,10 +856,10 @@ void portable_ftoa ( double n, char * res, unsigned no_of_decimals, unsigned res
   if ( no_of_decimals > FTOA_MAX_DECIMALS )
     no_of_decimals = FTOA_MAX_DECIMALS;
 
-  // -------------------  NaN und Inf abfangen
+  // -------------------  Catch NaN and Inf
   //
-  //  my_break_point haelt nur unter dem Debugger an - im Feld muss trotzdem
-  //  ein definierter String herauskommen, deshalb danach die '*'-Fuellung.
+  //  my_break_point stops only under the debugger - in the field a defined
+  //  string must still come out, so the '*' fill follows.
 
   if ( isnan ( n ) || isinf ( n ) )
   {
@@ -868,7 +868,7 @@ void portable_ftoa ( double n, char * res, unsigned no_of_decimals, unsigned res
     goto done;
   }
 
-  // -------------------  Vorzeichen abspalten
+  // -------------------  Split off the sign
 
   value = n;
 
@@ -878,16 +878,16 @@ void portable_ftoa ( double n, char * res, unsigned no_of_decimals, unsigned res
     value       = -value;
   }
 
-  // -------------------  Runden und in Ganzzahl umrechnen
+  // -------------------  Round and convert to integer
   //
-  //  Alles in EINER Ganzzahl ( total ) halten - dadurch kann das Runden
-  //  nicht mehr zwischen Vor- und Nachkommateil auseinanderlaufen
-  //  ( altes Problem: 233.007 mit 2 Stellen ).
+  //  Keep everything in ONE integer ( total ) - so rounding can no longer
+  //  get out of step between the integer part and the decimal part
+  //  ( old problem: 233.007 with 2 decimals ).
 
   scale  = portable_ftoa_Pow10 ( no_of_decimals );
   scaled = value * (double) scale + 0.5;
 
-  if ( scaled >= 4294967296.0 )                   // passt nicht in uint32_t
+  if ( scaled >= 4294967296.0 )                   // does not fit into uint32_t
   {
     portable_ftoa_Overflow ( res, res_len );
     goto done;
@@ -897,7 +897,7 @@ void portable_ftoa ( double n, char * res, unsigned no_of_decimals, unsigned res
   ipart = total / scale;
   fpart = total % scale;
 
-  // -------------------  Laenge vorab bestimmen, BEVOR geschrieben wird
+  // -------------------  Find the length first, BEFORE anything is written
 
   int_digits = 1;
   probe      = ipart;
@@ -914,15 +914,15 @@ void portable_ftoa ( double n, char * res, unsigned no_of_decimals, unsigned res
     needed++;
 
   if ( no_of_decimals > 0 )
-    needed += 1 + no_of_decimals;                 // '.' plus Nachkommastellen
+    needed += 1 + no_of_decimals;                 // '.' plus decimal places
 
-  if ( needed > res_len )                         // passt nicht -> nicht luegen
+  if ( needed > res_len )                         // does not fit -> do not lie
   {
     portable_ftoa_Overflow ( res, res_len );
     goto done;
   }
 
-  // -------------------  Ab hier ist garantiert, dass alles hineinpasst
+  // -------------------  From here on it is certain that everything fits
 
   pos = 0;
 
@@ -1359,7 +1359,7 @@ int16_t portable_atoi ( const char* ValText )
 // ****************************************************************************
 {
   uint32_t  i         = 0;
-  int8_t    sign      = 1;    // plus assumed    08.10.2026 : war uint8_t - aus "-3" wurde 765
+  int8_t    sign      = 1;    // plus assumed    08.10.2026 : was uint8_t - "-3" became 765
   int16_t   result    = 0;
   //
   //  normal processing
@@ -1406,7 +1406,7 @@ int32_t portable_atol ( const char* ValText )
 // ****************************************************************************
 {
   uint32_t  i         = 0;
-  int8_t    sign      = 1;    // plus assumed    08.10.2026 : war uint8_t - aus "-3" wurde 765
+  int8_t    sign      = 1;    // plus assumed    08.10.2026 : was uint8_t - "-3" became 765
   int32_t   result    = 0;
   //
   //  normal processing

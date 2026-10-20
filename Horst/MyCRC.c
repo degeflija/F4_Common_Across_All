@@ -2,7 +2,7 @@
   * ############################################################################
   * @file     MyCRC.c
   * @brief    New Vario
-  * @author   Horst Rupp nach Vorlage von Klaus Schaefer
+  * @author   Horst Rupp, based on a template by Klaus Schaefer
   * @brief    This
   * ############################################################################
   */

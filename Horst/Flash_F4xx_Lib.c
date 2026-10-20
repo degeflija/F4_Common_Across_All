@@ -358,9 +358,9 @@ uint8_t AD57_CRC_Plus_EEProm_Health_Check ( void )
 //  6. BL on AD57, read from uSD, flash local application
 //
 //
-//  21.09.2026 : Rueckgabe c_ok nur, wenn die Anwendung vollstaendig geflasht,
-//  verifiziert und CRC-geprueft ist. Nur dann darf task_Flash_Loop_Control
-//  in die Anwendung springen. Bei c_nok bleibt das Geraet im BootLoader.
+//  21.09.2026 : Returns c_ok only when the application is fully flashed,
+//  verified and CRC checked. Only then may task_Flash_Loop_Control jump
+//  into the application. On c_nok the device stays in the BootLoader.
 //
 uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
 {
@@ -382,12 +382,12 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
     //  Step 1 : Open the hex input file to be flashed
     //
     //
-    //  LINT-Fix A1 : <dir_list_index> kommt aus der Cursorposition der MMI und
-    //  war hier ungeprueft. g_DirListItems hat nur c_max_dirlistitems Zeilen;
-    //  ein zu grosser Index las weit hinter dem Array, und das anschliessende
-    //  strcpy() lief dann ohne Laengenbegrenzung in l_filename[256].
-    //  Die MMI prueft inzwischen selbst -- das hier ist die zweite Schranke,
-    //  weil diese Funktion aus dem Common-Tier heraus aufgerufen wird.
+    //  LINT-Fix A1 : <dir_list_index> comes from the MMI cursor position and
+    //  was not checked here. g_DirListItems has only c_max_dirlistitems rows;
+    //  an index that was too large read far past the end of the array, and the
+    //  strcpy() after it then ran into l_filename[256] without a length limit.
+    //  The MMI now checks the index itself -- this is the second barrier,
+    //  because this function is called from the Common tier.
     //
     if ( dir_list_index >= c_max_dirlistitems )
     {
@@ -400,18 +400,18 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
     }
 
     //
-    //  laengenbegrenzt kopieren statt strcpy(), und sicher terminieren
+    //  copy with a length limit instead of strcpy(), and terminate safely
     //
     memcpy ( l_filename, g_DirListItems[dir_list_index], c_filename_size );
     l_filename[c_filename_size] = 0;
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     //
-    //  21.09.2026 : Laesst sich die Datei nicht oeffnen, wird NICHT geflasht.
-    //  Hier stand nur eine ASSERT, und SD_Card_File_Open_4_Read() der alten
-    //  BL-Fassung gab ohnehin immer SD_OK zurueck. Der Ablauf loeschte dann in
-    //  Schritt 5 die Anwendung und schrieb den Inhalt einer nie geoeffneten
-    //  Datei hinein. Jetzt Abbruch, BEVOR ein Sektor angefasst wird - die alte
-    //  Anwendung bleibt heil.
+    //  21.09.2026 : If the file cannot be opened, nothing is flashed.
+    //  Here was only an ASSERT, and SD_Card_File_Open_4_Read() of the old
+    //  BL version always returned SD_OK anyway. The sequence then erased the
+    //  application in step 5 and wrote the content of a file that was never
+    //  opened into it. Now we abort BEFORE any sector is touched - the old
+    //  application stays intact.
     //
     if ( l_sd_result != SD_OK )
     {
@@ -423,7 +423,7 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
                                 &Flash_LCtr_OutQItem,
                                 portMAX_DELAY );
       ASSERT ( l_q_result == 1 );
-      vTaskDelay ( 10000 );     //  Meldung stehen lassen
+      vTaskDelay ( 10000 );     //  leave the message on screen
       return c_nok;
     }
 
@@ -445,10 +445,10 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
                                 portMAX_DELAY );
       ASSERT ( l_q_result == 1 );
       //
-      //  LINT-Fix 5 : hier fehlte das return. Der Zweig meldete, dass die
-      //  Hex-Datei nicht in den Flash passt, und fing danach trotzdem an,
-      //  Sektoren zu loeschen -- am Ende stand eine halb geloeschte Anwendung
-      //  im oberen Flash.
+      //  LINT-Fix 5 : the return was missing here. The branch reported that the
+      //  hex file does not fit into the flash, and then started to erase
+      //  sectors anyway -- in the end a half erased application was left
+      //  in the upper flash.
       //
       SD_Card_File_Close ( &hex_input_file );
       return c_nok;
@@ -556,12 +556,12 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
           ASSERT ( l_q_result == 1 );
 
           //
-          //  21.09.2026 : Abbruch statt Weitermachen. Hier stand nur eine
-          //  ASSERT, danach lief das Flashen weiter und am Ende sprang
-          //  task_Flash_Loop_Control in die fehlerhafte Anwendung.
+          //  21.09.2026 : Abort instead of going on. Here was only an
+          //  ASSERT, then flashing went on, and at the end
+          //  task_Flash_Loop_Control jumped into the broken application.
           //
           (void) SD_Card_File_Close ( &hex_input_file );
-          vTaskDelay ( 10000 );   //  Meldung stehen lassen
+          vTaskDelay ( 10000 );   //  leave the message on screen
           return c_nok;
         }
 
@@ -594,10 +594,11 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
     }
 
     //
-    //  21.09.2026 : Ein Lesefehler mitten in der Datei beendet die Schleife
-    //  oben wie ein Dateiende ( SD_Card_File_Read() liefert dann SD_EOF und
-    //  0 Bytes ). Erkennbar ist er daran, dass SD_Card_Mark_Dead() die Karte
-    //  abgemeldet hat. Dann ehrlich "uSD Read FAILED" statt CRC-Fehler.
+    //  21.09.2026 : A read error in the middle of the file ends the loop
+    //  above like an end of file ( SD_Card_File_Read() then returns SD_EOF
+    //  and 0 bytes ). You can tell it by SD_Card_Mark_Dead() having logged
+    //  off the card. Then report honestly "uSD Read FAILED" instead of a
+    //  CRC error.
     //
     if ( ! g_SDCard_Mounted )
     {
@@ -609,7 +610,7 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
                                 &Flash_LCtr_OutQItem,
                                 portMAX_DELAY );
       ASSERT ( l_q_result == 1 );
-      vTaskDelay ( 10000 );     //  Meldung stehen lassen
+      vTaskDelay ( 10000 );     //  leave the message on screen
       return c_nok;
     }
 
@@ -622,10 +623,10 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
       ASSERT ( l_q_result == 1 );
 
       //
-      //  21.09.2026 : Abbruch statt Weitermachen - siehe Verifikationsfehler.
+      //  21.09.2026 : Abort instead of going on - see verification failure.
       //
       (void) SD_Card_File_Close ( &hex_input_file );
-      vTaskDelay ( 10000 );       //  Meldung stehen lassen
+      vTaskDelay ( 10000 );       //  leave the message on screen
       return c_nok;
     }
 
@@ -647,34 +648,34 @@ uint8_t BL_on_AD57_Read_SD_Flash_Local_Appl ( uint16_t  dir_list_index )
 //  7. Appl on AD57, read from uSD, flash local BL
 //
 //
-//  21.09.2026 : Neu aufgebaut. Hier wird der BootLoader ueberschrieben -
-//  Sektor 0 mit dem Reset-Vektor eingeschlossen. Geht nach dem Loeschen etwas
-//  schief, startet das Geraet beim naechsten Einschalten nicht mehr und ist
-//  nur noch mit ST-Link zu retten.
+//  21.09.2026 : Rebuilt. This overwrites the BootLoader - including
+//  sector 0 with the reset vector. If something goes wrong after the
+//  erase, the device does not start at the next power on and can only
+//  be rescued with ST-Link.
 //
-//  Deshalb :
+//  Therefore :
 //
-//    1.  Probelauf VOR dem Loeschen : die ganze Datei wird einmal gelesen,
-//        Groesse und CRC werden geprueft - genau so, wie es spaeter beim
-//        Flashen noch einmal geschieht. Fehlt die Datei, ist sie zu gross,
-//        kaputt oder die Karte liest nicht sauber, wird abgebrochen und der
-//        alte BootLoader bleibt unberuehrt.
+//    1.  Dry run BEFORE the erase : the whole file is read once, size
+//        and CRC are checked - exactly as is done again later during
+//        flashing. If the file is missing, too large, broken, or the
+//        card does not read cleanly, we abort and the old BootLoader
+//        stays untouched.
 //
-//    2.  Rueckgabe c_ok / c_nok. Nur bei c_ok startet task_MMI den
-//        BootLoader neu. Bisher geschah das immer, auch nach einem Fehler -
-//        also Sprung in einen halb geloeschten BootLoader.
+//    2.  Returns c_ok / c_nok. Only on c_ok does task_MMI restart the
+//        BootLoader. Before, this always happened, even after an error -
+//        so a jump into a half erased BootLoader.
 //
-//    3.  g_ProgramStatus.IsInError sagt der Seite c_Wait4Flash, was passiert
-//        ist :
-//          c_BL_Flash_Not_Done       BootLoader nicht angefasst, alles heil
-//          c_BL_Flash_BL_Destroyed   BootLoader geloescht und nicht fertig
-//                                    geschrieben - NICHT ausschalten,
-//                                    Update wiederholen
+//    3.  g_ProgramStatus.IsInError tells the page c_Wait4Flash what
+//        happened :
+//          c_BL_Flash_Not_Done       BootLoader not touched, all intact
+//          c_BL_Flash_BL_Destroyed   BootLoader erased and not fully
+//                                    written - do NOT switch off,
+//                                    repeat the update
 //
-//    s_BL_Destroyed merkt sich Letzteres bis zu einem erfolgreichen Flash.
-//    Scheitert der naechste Versuch schon vor dem Loeschen ( z.B. weil die
-//    Karte inzwischen abgemeldet ist ), darf die Meldung trotzdem nicht
-//    "alles heil" lauten.
+//    s_BL_Destroyed remembers the second case until a flash succeeds.
+//    If the next try fails already before the erase ( e.g. because the
+//    card has been logged off meanwhile ), the message must still not
+//    say "all intact".
 //
 uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
 {
@@ -710,9 +711,9 @@ uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
     //
     l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_min_lower_addr_space_sector );
 
-    //  Step 3 : Probelauf - ganze Datei lesen, Groesse und CRC pruefen.
-    //           Dieselbe CRC-Rechnung wie in Step 6, nur auf den Dateidaten
-    //           statt auf dem zurueckgelesenen Flash.
+    //  Step 3 : Dry run - read the whole file, check size and CRC.
+    //           Same CRC calculation as in Step 6, only on the file data
+    //           instead of on the flash read back.
     //
     l_feof        = 0;
     l_count_size  = 0;
@@ -729,7 +730,7 @@ uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
       {
         l_count_size += l_bytesread;
         if ( l_count_size > l_flashable_space )
-          break;                                //  Datei zu gross
+          break;                                //  file too large
 
         if ( l_bytesread != sizeof ( AppSignature_t ) )
         {
@@ -748,13 +749,13 @@ uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
     }
 
     if  (
-            ( ! g_SDCard_Mounted )                  //  Lesefehler, Karte abgemeldet
+            ( ! g_SDCard_Mounted )                  //  read error, card logged off
           ||
-            ( l_count_size == 0 )                   //  leere Datei
+            ( l_count_size == 0 )                   //  empty file
           ||
-            ( l_count_size > l_flashable_space )    //  zu gross
+            ( l_count_size > l_flashable_space )    //  too large
           ||
-            ( l_crc != 0 )                          //  Inhalt kaputt
+            ( l_crc != 0 )                          //  content broken
         )
     {
       (void) SD_Card_File_Close ( &hex_input_file );
@@ -763,7 +764,7 @@ uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
       return c_nok;
     }
 
-    //  Step 4 : Datei fuer den eigentlichen Durchgang wieder an den Anfang
+    //  Step 4 : Rewind the file to the start for the real pass
     //
     l_sd_result = SD_Card_File_ReOpen_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     if ( l_sd_result != SD_OK )
@@ -775,7 +776,7 @@ uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
 
     //  Step 5 : Loop to erase sectors
     //
-    //  AB HIER ist der alte BootLoader weg.
+    //  FROM HERE ON the old BootLoader is gone.
     //
     s_BL_Destroyed = true;
     Flash_F4xx_SetSectorAddrs ( c_min_lower_addr_space_sector );
@@ -826,7 +827,7 @@ uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
         if ( l_result != 0 )
         {
           //
-          //  verification failure - Abbruch statt Weitermachen
+          //  verification failure - abort instead of going on
           //
           (void) SD_Card_File_Close ( &hex_input_file );
           g_ProgramStatus.IsInError = c_BL_Flash_BL_Destroyed;
@@ -863,8 +864,8 @@ uint8_t Appl_on_AD57_Read_SD_Flash_Local_BL ( void )
     (void) SD_Card_File_Close ( &hex_input_file );
 
     //
-    //  Lesefehler im zweiten Durchgang ( Karte abgemeldet ) oder CRC falsch :
-    //  der BootLoader ist geloescht und nicht vollstaendig geschrieben.
+    //  Read error in the second pass ( card logged off ) or wrong CRC :
+    //  the BootLoader is erased and not fully written.
     //
     if ( ( ! g_SDCard_Mounted ) || ( l_crc != 0 ) )
     {
@@ -914,12 +915,12 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     //            and flashed in remote system
     //
     //
-    //  LINT-Fix A1 : <dir_list_index> kommt aus der Cursorposition der MMI und
-    //  war hier ungeprueft. g_DirListItems hat nur c_max_dirlistitems Zeilen;
-    //  ein zu grosser Index las weit hinter dem Array, und das anschliessende
-    //  strcpy() lief dann ohne Laengenbegrenzung in l_filename[256].
-    //  Die MMI prueft inzwischen selbst -- das hier ist die zweite Schranke,
-    //  weil diese Funktion aus dem Common-Tier heraus aufgerufen wird.
+    //  LINT-Fix A1 : <dir_list_index> comes from the MMI cursor position and
+    //  was not checked here. g_DirListItems has only c_max_dirlistitems rows;
+    //  an index that was too large read far past the end of the array, and the
+    //  strcpy() after it then ran into l_filename[256] without a length limit.
+    //  The MMI now checks the index itself -- this is the second barrier,
+    //  because this function is called from the Common tier.
     //
     if ( dir_list_index >= c_max_dirlistitems )
     {
@@ -932,15 +933,15 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
     }
 
     //
-    //  laengenbegrenzt kopieren statt strcpy(), und sicher terminieren
+    //  copy with a length limit instead of strcpy(), and terminate safely
     //
     memcpy ( l_filename, g_DirListItems[dir_list_index], c_filename_size );
     l_filename[c_filename_size] = 0;
     l_sd_result = SD_Card_File_Open_4_Read ( &hex_input_file, (uint8_t*) l_filename );
     //
-    //  21.09.2026 : Laesst sich die Datei nicht oeffnen, wird abgebrochen -
-    //  und zwar VOR Step 3. Dort wird der Satellit per CAN in seinen
-    //  BootLoader geschickt; ohne Datei stuende er danach ohne Anwendung da.
+    //  21.09.2026 : If the file cannot be opened, we abort - and we do it
+    //  BEFORE Step 3. Step 3 sends the satellite into its BootLoader via
+    //  CAN; without a file it would then be left without an application.
     //
     if ( l_sd_result != SD_OK )
     {
@@ -952,7 +953,7 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
                                 &Flash_LCtr_OutQItem,
                                 portMAX_DELAY );
       ASSERT ( l_q_result == 1 );
-      vTaskDelay ( 10000 );     //  Meldung stehen lassen
+      vTaskDelay ( 10000 );     //  leave the message on screen
       return;
     }
 
@@ -1016,11 +1017,11 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
                                         &l_bytesread );
 
       //
-      //  21.09.2026 : 0 Bytes gelesen, aber noch keine Magic Number gefunden :
-      //  entweder Lesefehler ( SD_Card_File_Read() meldet ihn als SD_EOF mit
-      //  0 Bytes ) oder die Datei ist ohne Magic Number zu Ende. Bisher lief
-      //  die Schleife dann endlos weiter und schickte 0xFF-Bloecke an den
-      //  Satelliten. Jetzt Abbruch mit Meldung, wie bei c_flash_transfer_failure.
+      //  21.09.2026 : 0 bytes read, but no Magic Number found yet :
+      //  either a read error ( SD_Card_File_Read() reports it as SD_EOF with
+      //  0 bytes ) or the file ends without a Magic Number. Before, the loop
+      //  then ran on forever and sent 0xFF blocks to the satellite.
+      //  Now abort with a message, as for c_flash_transfer_failure.
       //
       if ( ( l_bytesread == 0 ) ||
            ( ( l_sd_result != SD_OK ) && ( l_sd_result != SD_EOF ) ) )
@@ -1035,7 +1036,7 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
         ASSERT ( l_q_result == 1 );
 
         (void) SD_Card_File_Close ( &hex_input_file );
-        vTaskDelay ( 10000 );     //  Meldung stehen lassen
+        vTaskDelay ( 10000 );     //  leave the message on screen
         return;
       }
 
@@ -1069,10 +1070,10 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
       //
       // After <l_Magic_No_Found> there is only one more data xfer
       //
-      //  16.09.2026 : MDP_Send_Data_via_CAN wiederholt verlorene Rahmen selbst
-      //  und liefert false erst, wenn alle Wiederholungen erschoepft sind.
-      //  Dann Abbruch mit Meldung ; der Aufrufer ( task_Flash_Loop_Control )
-      //  springt anschliessend wie nach einem fertigen Flash in die Anwendung.
+      //  16.09.2026 : MDP_Send_Data_via_CAN repeats lost frames by itself
+      //  and returns false only when all retries are used up.
+      //  Then abort with a message ; the caller ( task_Flash_Loop_Control )
+      //  then jumps into the application, as after a finished flash.
       //
       if ( ! MDP_Send_Data_via_CAN ( p_id + 0x10, buffer1.u8, c_buffer_size ) )
       {
@@ -1086,7 +1087,7 @@ void BL_on_AD57_Read_SD_Push_CAN_2_Flash_Remote_Appl ( uint16_t p_id, uint16_t  
         ASSERT ( l_q_result == 1 );
 
         (void) SD_Card_File_Close ( &hex_input_file );
-        vTaskDelay ( 10000 );     //  Meldung stehen lassen
+        vTaskDelay ( 10000 );     //  leave the message on screen
         return;
       }
       //
@@ -1200,11 +1201,11 @@ void BL_on_F4_Read_CAN_Flash_Local_Appl ( void )
   {
     uint16_t    l_result = 0;
     //
-    //  FIX 16.09.2026 : <l_bytesread> stand fest auf 0 und wurde nie
-    //  gesetzt - Speichervergleich ( 4d ) und beide CRCs ( 4e / 4f ) liefen
-    //  ueber 0 Bytes, die Verifikation hat nie etwas geprueft. Jeder Block
-    //  ist hier genau c_buffersize_inbytes gross ( MDP_Receive_Data_via_CAN
-    //  fuellt immer den ganzen Puffer ).
+    //  FIX 16.09.2026 : <l_bytesread> was fixed at 0 and never set -
+    //  the memory compare ( 4d ) and both CRCs ( 4e / 4f ) ran over
+    //  0 bytes, so the verification never checked anything. Every block
+    //  here is exactly c_buffersize_inbytes in size
+    //  ( MDP_Receive_Data_via_CAN always fills the whole buffer ).
     //
     uint32_t    l_bytesread = c_buffersize_inbytes;
     buffer_t    buffer1;
@@ -1217,7 +1218,7 @@ void BL_on_F4_Read_CAN_Flash_Local_Appl ( void )
 
     //  ----------------- Preamble -------------------------------------------------------
     //
-    //  1.  Licht aus
+    //  1.  Lights off
     //
     HAL_GPIO_WritePin ( LED_Port, LEDgreen_left_Pin, GPIO_PIN_RESET );
 
@@ -1363,13 +1364,13 @@ void BL_on_F4_Read_CAN_Flash_Local_Appl ( void )
 
     //  .......................................................................
     //
-    //  Sektor 7 wird nicht mehr beschrieben.
+    //  Sector 7 is no longer written.
     //
-    //  Der Boot-Entscheid haengt nur noch an der selbstsignierten
-    //  In-Image-Signatur ( siehe Check_Application_In_Upper_Address_Space
-    //  und Generic_Signature_SelfSign ). F4_Write_Signature_Sector_7 ist
-    //  weiter unten bereits auskommentiert - dieser Aufruf war der letzte
-    //  Rest davon und liess F4_GenBL nicht mehr linken :
+    //  The boot decision now depends only on the self signed in-image
+    //  signature ( see Check_Application_In_Upper_Address_Space
+    //  and Generic_Signature_SelfSign ). F4_Write_Signature_Sector_7 is
+    //  already commented out further down - this call was the last
+    //  remnant of it and made F4_GenBL fail to link :
     //  "undefined reference to F4_Write_Signature_Sector_7".
     //
     //  13.09.2026
@@ -1964,16 +1965,16 @@ void Generic_Signature_SelfSign ( void )
     //  FLASH ORIGIN = 0x08080000; only the unused *_not_relocated.ld
     //  starts at 0x08000000).
     //
-    //  26.09.2026 : Schutz gegen einen NICHT relocated gebauten Stand
-    //  ( Image ab 0x08000000 ). Dann liegt die Signatur unterhalb von
-    //  APP_ADDRESS, die Subtraktion unten wuerde negativ ( als uint32_t
-    //  rund 4 GB ), und die CRC-Schleife liest ueber das Flash-Ende hinaus
-    //  --> BusFault in Flash_F4xx_Read. So startet ein nicht relocated
-    //  gebautes Audio unter dem Debugger normal, nur eben unsigniert.
+    //  26.09.2026 : Protection against a build that is NOT relocated
+    //  ( image from 0x08000000 ). Then the signature lies below
+    //  APP_ADDRESS, the subtraction below would be negative ( as uint32_t
+    //  about 4 GB ), and the CRC loop reads past the end of the flash
+    //  --> BusFault in Flash_F4xx_Read. With this check an Audio built
+    //  not relocated starts normally under the debugger, just unsigned.
     //
     if ( ( (uint32_t) &ThisApplicationsSignature[0] ) < APP_ADDRESS )
     {
-      return;    // nicht relocated gebaut -- nichts zu signieren
+      return;    // built not relocated -- nothing to sign
     }
 
     l_bytes_total = ( (uint32_t) &ThisApplicationsSignature[0] ) - APP_ADDRESS;

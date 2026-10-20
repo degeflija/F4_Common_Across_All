@@ -88,12 +88,12 @@
                                             //!>    ( c_SS_Cruising, c_SS_Transient, c_SS_Climbing )
 
     c_CID_SNO_TurnCoord         = 0x10c,    //!< int16_t 1/1000 rad slip      -- plane frame
-                                            //!< Ausschlag Scheinlot nach innen außen in der Kurve
+                                            //!< deflection of the apparent vertical inward / outward in the turn
                                             //!< int16_t 1/1000 rad turnrate  -- plane frame
                                             //!< int16_t 1/1000 rad nick      -- plane frame
-                                            //!< Ausschlag Scheinlot nach vorn hinten durch Bremsen      !!! not used !!!!!!!!!!!!!!
+                                            //!< deflection of the apparent vertical forward / back by braking      !!! not used !!!!!!!!!!!!!!
 
-    c_CID_SNO_SystemState       = 0x10d,    //!< uint32_t Bitmuster
+    c_CID_SNO_SystemState       = 0x10d,    //!< uint32_t bit pattern
                                             //!< uint32_t version info
     c_CID_SNO_Vdd               = 0x112,    //!< unit16_t as float voltage * 10
 
@@ -133,7 +133,7 @@
     c_CID_UTL_Humidity          = 0x204,    //!< unit32_t as float hum * 1000
     c_CID_UTL_Pressure          = 0x205,    //!< unit32_t as float press * 1000
     c_CID_UTL_Flaps_Data        = 0x206,    //!< uint16_t position [percent * 100]
-                                            //   0x207 : 10.10.2026 frei ( frueher Reboot-Taster am Audio )
+                                            //   0x207 : 10.10.2026 free ( was the reboot button on the Audio )
 
     //
     //  CAN packages with source AD57
@@ -172,59 +172,59 @@
                                             //!< uint8_t  duty cycle
                                             //!< uint8_t  climb-mode
 
-    //  27.09.2026 : 0x312 c_CID_AD57_Flaps_Status ( FE -> Audio, LED-Leiste
-    //  der Woelbklappen ) gestrichen - die LED-Leiste entfaellt.
-    //  0x312 nicht wiederverwenden, solange noch alte Audio-SW fliegt.
+    //  27.09.2026 : 0x312 c_CID_AD57_Flaps_Status ( FE -> Audio, LED bar
+    //  for the flaps ) removed - the LED bar is dropped.
+    //  Do not reuse 0x312 while old Audio SW is still flying.
     c_CID_AD57_HeartBeatSlave   = 0x313,    //!< uint32_t  version as 0x0102002a "1.02 Build 42"
 
     //
-    //  Abgleich der beiden AD57 im Doppelsitzer ( 13.10.2026, neues Konzept,
-    //  Master_Slave_Lib.c ). Ersetzt Master/Slave, MakeMeMaster und
+    //  Sync of the two AD57 in the two-seater ( 13.10.2026, new concept,
+    //  Master_Slave_Lib.c ). Replaces Master/Slave, MakeMeMaster and
     //  Sync-Mode.
     //
-    //  0x322, 0x323, 0x324, 0x326, 0x327 sind FREI, aber NICHT wieder
-    //  verwenden, solange AD57 mit SW vor 7.23 Build 10 fliegen : deren
-    //  Empfaenger deuten diese Kennungen noch als GRAB/LOST_CONTROL,
-    //  SYNC_PARAMETER, Flugzeugtyp und Kennzeichen. Darum liegen die neuen
-    //  Kennungen auf 0x328 .. 0x32D, die die alte SW ueberliest.
+    //  0x322, 0x323, 0x324, 0x326, 0x327 are FREE, but do NOT reuse them
+    //  while AD57 with SW before 7.23 Build 10 are flying : their
+    //  receivers still read these ids as GRAB/LOST_CONTROL,
+    //  SYNC_PARAMETER, aircraft type and registration. That is why the new
+    //  ids are at 0x328 .. 0x32D, which the old SW ignores.
     //
-    c_CID_AD57_SWITCH_STATE     = 0x325,    //!< 26.09.2026 : Mikroschalter FW/BK und Klappen-Raste an das andere AD57
+    c_CID_AD57_SWITCH_STATE     = 0x325,    //!< 26.09.2026 : micro switches gear/airbrakes and flap detent to the other AD57
                                             //!< uint8_t  c_Switch_State_Magic
-                                            //!< uint8_t  Gear_Locked ( am Schaltpunkt )
-                                            //!< uint8_t  Brakes_Locked ( eingefahren )
+                                            //!< uint8_t  Gear_Locked ( at the switch point )
+                                            //!< uint8_t  Brakes_Locked ( retracted )
                                             //!< uint8_t  Gear_Switch_Position ( 0 / 1 )
-                                            //!< uint8_t  gueltig : Bit 0 Schalter, Bit 1 Klappen
-                                            //!< uint8_t  Klappen-Raste
-                                            //!< 13.10.2026 abends : DLC wieder 6 ( Byte 6 Sitz entfallen ).
-                                            //!< Bit 0 / Bit 1 sagen, dass am Sender Schalter / Poti haengen.
+                                            //!< uint8_t  valid : Bit 0 switches, Bit 1 flaps
+                                            //!< uint8_t  flap detent
+                                            //!< 13.10.2026 evening : DLC back to 6 ( byte 6 seat dropped ).
+                                            //!< Bit 0 / Bit 1 say that switches / poti are connected at the sender.
     //
-    //  13.10.2026 abends : einfacher Abgleich ( c_Sync_Version 2,
-    //  Master_Slave_Lib.c ). 0x32E ( SEAT_SET vom Mittag ) ist frei, aber
-    //  nicht wieder verwenden, solange AD57 mit dem Build vom Mittag fliegen.
+    //  13.10.2026 evening : simple sync ( c_Sync_Version 2,
+    //  Master_Slave_Lib.c ). 0x32E ( SEAT_SET from midday ) is free, but
+    //  do not reuse it while AD57 with the midday build are flying.
     //
-    c_CID_AD57_SYNC_INFO        = 0x328,    //!< Kopf des Abgleichs, mit jedem HeartBeat, DLC 8
+    c_CID_AD57_SYNC_INFO        = 0x328,    //!< header of the sync, with every HeartBeat, DLC 8
                                             //!< uint8_t  c_Sync_Version
-                                            //!< uint8_t  Bit 0 : fuehrt den Ton, Bit 1 : bereit ( Hochlauf fertig )
-                                            //!< uint8_t  Ton-Anspruch ( Zaehler )
+                                            //!< uint8_t  Bit 0 : owns the tone, Bit 1 : ready ( start-up done )
+                                            //!< uint8_t  tone claim ( counter )
                                             //!< uint8_t  Flight_Phase
-                                            //!< uint32_t Laufzeit seit dem Start in s
-    c_CID_AD57_SYNC_ONE         = 0x329,    //!< ein gemeinsamer Wert, DLC 8
-                                            //!< uint16_t Schluessel
-                                            //!< uint8_t  Bit 0 : Teil von "alle Werte einmal"
+                                            //!< uint32_t run time since start in s
+    c_CID_AD57_SYNC_ONE         = 0x329,    //!< one shared value, DLC 8
+                                            //!< uint16_t key
+                                            //!< uint8_t  Bit 0 : part of "all values once"
 
                                             //!< uint8_t  0
-                                            //!< uint32_t Wert ( int32_t oder float-Bits )
-    c_CID_AD57_SYNC_ACK         = 0x32A,    //!< Quittung fuer SYNC_ONE, DLC 2
-                                            //!< uint16_t Schluessel
-    c_CID_AD57_SYNC_HEAD        = 0x32B,    //!< Kopf des Piloten-Satzes, DLC 8
+                                            //!< uint32_t value ( int32_t or float bits )
+    c_CID_AD57_SYNC_ACK         = 0x32A,    //!< ACK for SYNC_ONE, DLC 2
+                                            //!< uint16_t key
+    c_CID_AD57_SYNC_HEAD        = 0x32B,    //!< header of the pilot set, DLC 8
                                             //!< uint8_t  4 ( c_Sync_Grp_P )
-                                            //!< uint8_t  Anzahl Werte
-    c_CID_AD57_SYNC_VALUE       = 0x32C,    //!< ein Wert des Piloten-Satzes, DLC 8
+                                            //!< uint8_t  number of values
+    c_CID_AD57_SYNC_VALUE       = 0x32C,    //!< one value of the pilot set, DLC 8
                                             //!< uint8_t  4 ( c_Sync_Grp_P )
-                                            //!< uint8_t  laufende Nummer 0 .. Anzahl-1
-                                            //!< uint16_t Schluessel
-                                            //!< uint32_t Wert ( int32_t oder float-Bits )
-    c_CID_AD57_PILOT_SET        = 0x32D,    //!< uint8_t 1 Angebot / 2 Anforderung / 3 abgelehnt
+                                            //!< uint8_t  running number 0 .. count-1
+                                            //!< uint16_t key
+                                            //!< uint32_t value ( int32_t or float bits )
+    c_CID_AD57_PILOT_SET        = 0x32D,    //!< uint8_t 1 offer / 2 request / 3 rejected
 
 
     /*
@@ -234,14 +234,14 @@
     c_CID_AD57_HAVE_CONTROL     = 0x321,
     //!< empty package, just a trigger
 
-    Wenn ein Frontend "have_control" empfängt, stellt es sich
-    automatisch als Slave ein und sendet nichts mehr auf dem CAN.
+    When a FrontEnd receives "have_control", it sets itself to
+    Slave automatically and sends nothing more on the CAN.
 
-    Ein Front-End, das Master werden will, sendet dieses Paket
-    ohne Inhalt DLC=0 und beginnt danach selber zu senden.
+    A FrontEnd that wants to become Master sends this package
+    without content, DLC=0, and then starts to send by itself.
 
-    c_CID_AD57_MC_CREADY verwende ich, um Audio-Lautstärke
-    und MC-Wert auf beiden Geräten zu synchronisieren.
+    I use c_CID_AD57_MC_CREADY to sync audio volume and
+    MC value on both devices.
     */
 
     //
@@ -272,18 +272,18 @@
   };
 
   //
-  //  **** Item-IDs fuer c_CID_SNN_Set_Config_Item ( 0x402 ) *******************
+  //  **** Item IDs for c_CID_SNN_Set_Config_Item ( 0x402 ) *******************
   //
-  //  Nutzlast : data_h[0] = CMD, dlc = 2
+  //  Payload : data_h[0] = CMD, dlc = 2
   //
-  //  Die CMD_-Codes sind reine Trigger.
+  //  The CMD_ codes are pure triggers.
   //
-  #define CMD_MEASURE_LEFT      0x3000    //  Messung 1 : linke Flaeche unten
-  #define CMD_MEASURE_RIGHT     0x3001    //  Messung 2 : rechte Flaeche unten
-  #define CMD_MEASURE_LEVEL     0x3002    //  Messung 3 : Flaechen waagerecht
-  #define CMD_CALCULATE         0x3003    //  Einbaulage rechnen und speichern
-  #define CMD_TUNE              0x3004    //  Feinabgleich im Flug
-  #define CMD_RESET_SENSOR      0x3005    //  Sensorbox zuruecksetzen
+  #define CMD_MEASURE_LEFT      0x3000    //  Measurement 1 : left wing down
+  #define CMD_MEASURE_RIGHT     0x3001    //  Measurement 2 : right wing down
+  #define CMD_MEASURE_LEVEL     0x3002    //  Measurement 3 : wings level
+  #define CMD_CALCULATE         0x3003    //  compute and store the mounting orientation
+  #define CMD_TUNE              0x3004    //  fine calibration in flight
+  #define CMD_RESET_SENSOR      0x3005    //  reset the sensor box
 
 #endif  // __Generic_CAN_Ids_h
 
