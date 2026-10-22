@@ -128,7 +128,7 @@
                                             //!> = 2 Force XCSoar to GLIDE
                                             //!> = 3 Unforce XCSoar WINDUP
                                             //!> = 4 Force XCSoar to WINDUP
-    c_CID_UTL_Noise             = 0x202,    //!< ??   TODO
+    c_CID_UTL_Noise             = 0x202,
     c_CID_UTL_Temperature       = 0x203,    //!< int32_t  as float temp * 1000
     c_CID_UTL_Humidity          = 0x204,    //!< unit32_t as float hum * 1000
     c_CID_UTL_Pressure          = 0x205,    //!< unit32_t as float press * 1000
@@ -145,7 +145,7 @@
                                             //!> = 2 Force XCSoar to GLIDE
                                             //!> = 3 Unforce XCSoar WINDUP
                                             //!> = 4 Force XCSoar to WINDUP
-    c_CID_AD57_Noise            = 0x302,    //!< ??   TODO
+    c_CID_AD57_Noise            = 0x302,
     c_CID_AD57_Temperature      = 0x303,    //!< int32_t  as float temp * 1000
     c_CID_AD57_Humidity         = 0x304,    //!< unit32_t as float hum * 1000
     c_CID_AD57_Pressure         = 0x305,    //!< unit32_t as float press * 1000
@@ -256,7 +256,7 @@
     c_CID_AD57_Requests_Audio_CAN_MDP_Continuance = 0x350,    //!<
 
     //
-    //  Heart Beats  ?????????????????? TODO
+    //  Heart Beats  ??????????????????
     //
     c_CID_SNN_Heartbeat_Sens    = 0x520,
     c_CID_SNN_Heartbeat_GNSS    = 0x540,

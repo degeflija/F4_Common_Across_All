@@ -1313,7 +1313,7 @@ void BL_on_F4_Read_CAN_Flash_Local_Appl ( void )
       {
         //  mem compare verification failure
         //
-        my_break_point;         // TODO
+        my_break_point;
       }
 
       //  ........ Verify data by CRC .........................................
@@ -1390,7 +1390,7 @@ void BL_on_F4_Read_CAN_Flash_Local_Appl ( void )
 //
 //void Appl_on_F4_Read_CAN_Flash_Local_BL ( void )
 //{
-//  #if ( defined BUILD_F4_AUDIO_ )    // TODO
+//  #if ( defined BUILD_F4_AUDIO_ )    //
 //  {
 //    uint16_t    l_sd_result;
 //    uint16_t    l_result = 0;
@@ -1759,7 +1759,7 @@ void Bootloader_JumpToColdStart(void)
 //        drop_privileges();
 //      #endif
 //
-//      // beware of overflow  // TODO
+//      // beware of overflow  //
 //      //
 //      l_block_count++;
 //      if ( l_block_count >= l_max_block_count )
@@ -1778,7 +1778,7 @@ void Bootloader_JumpToColdStart(void)
 //
 //    //  Set flasher module internal addresses in last segment of lower space
 //    //
-//    l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector ); // TODO #2#2#2#2#2
+//    l_flashable_space = Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector ); //
 //
 //    //  READ bytewise in chunks of c_buffer_size
 //    //
@@ -1827,7 +1827,7 @@ void Bootloader_JumpToColdStart(void)
 //    //  last flash region of lower address space
 //    //  <<My_CurrentFlashWritePosition> -- <<My_CurrentFlashReadPosition>>
 //    //
-//    Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector ); // TODO #1#1#1#1
+//    Flash_F4xx_SetSectorAddrs ( c_max_lower_addr_space_sector ); //
 //
 //    //  Perform erasing on that sector
 //    //

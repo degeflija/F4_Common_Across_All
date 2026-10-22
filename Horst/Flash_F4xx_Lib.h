@@ -145,7 +145,7 @@
   //
   //  11.  Appl on F4, read from CAN, flash local BL
   //
-  //void Appl_on_F4_Read_CAN_Flash_Local_BL ( void );   // TODO
+  //void Appl_on_F4_Read_CAN_Flash_Local_BL ( void );   //
 
   //  **************************************************************************
   //
